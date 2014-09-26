@@ -11,8 +11,8 @@ The MSI will install a service called 'Sensu Client' and application into `%PROG
 Download
 ========
 
-Current version 0.1.5:
-https://github.com/carllindelof/sensu-client/releases/download/v0.1.5/sensu-client.msi
+Releases
+https://github.com/carllindelof/sensu-client/releases
 
 Start running
 =============
