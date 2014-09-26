@@ -1,0 +1,8 @@
+﻿{
+  "client": {
+    "name": "demo-sensu-client",
+    "address": "10.28.16.31",
+    "subscriptions": ["all"],
+	"safemode": true,
+  }
+}

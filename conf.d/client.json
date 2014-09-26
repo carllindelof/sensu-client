@@ -1,0 +1,8 @@
+﻿{
+  "client": {
+    "name": "democomputer",
+    "address": " 10.18.28.16",
+    "subscriptions": ["windows"],
+	"safemode": false,
+  }
+}

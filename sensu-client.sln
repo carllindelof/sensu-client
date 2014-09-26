@@ -1,0 +1,71 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2012
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{B991739C-7393-43B6-9D26-4360B6A0412F}"
+	ProjectSection(SolutionItems) = preProject
+		.nuget\NuGet.Config = .nuget\NuGet.Config
+		.nuget\NuGet.exe = .nuget\NuGet.exe
+		.nuget\NuGet.targets = .nuget\NuGet.targets
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "sensu-client", "sensu-client.csproj", "{4E2C3FE3-EC67-4C2B-9CF5-94EF6C9FFF6F}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{E13D525A-3A95-4A20-A3BC-41D3762106F0}"
+EndProject
+Project("{930C7802-8A8C-48F9-8165-68863BCCD9DD}") = "Setup", "Setup\Setup.wixproj", "{D5FFED85-866A-476E-AA2B-32FCDC0D2567}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tools", "Tools", "{3C5CF142-113F-4E50-93D1-A90EEA4AC1CA}"
+	ProjectSection(SolutionItems) = preProject
+		Tools\Import-Certificate.ps1 = Tools\Import-Certificate.ps1
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "sensu-client.Test", "sensu-client.Test\sensu-client.Test.csproj", "{03D940E6-D180-47D4-A0AE-2A0B7F4E2054}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Debug|Mixed Platforms = Debug|Mixed Platforms
+		Debug|x86 = Debug|x86
+		Release|Any CPU = Release|Any CPU
+		Release|Mixed Platforms = Release|Mixed Platforms
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{4E2C3FE3-EC67-4C2B-9CF5-94EF6C9FFF6F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4E2C3FE3-EC67-4C2B-9CF5-94EF6C9FFF6F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4E2C3FE3-EC67-4C2B-9CF5-94EF6C9FFF6F}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{4E2C3FE3-EC67-4C2B-9CF5-94EF6C9FFF6F}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{4E2C3FE3-EC67-4C2B-9CF5-94EF6C9FFF6F}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{4E2C3FE3-EC67-4C2B-9CF5-94EF6C9FFF6F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4E2C3FE3-EC67-4C2B-9CF5-94EF6C9FFF6F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4E2C3FE3-EC67-4C2B-9CF5-94EF6C9FFF6F}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{4E2C3FE3-EC67-4C2B-9CF5-94EF6C9FFF6F}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{4E2C3FE3-EC67-4C2B-9CF5-94EF6C9FFF6F}.Release|x86.ActiveCfg = Release|Any CPU
+		{D5FFED85-866A-476E-AA2B-32FCDC0D2567}.Debug|Any CPU.ActiveCfg = Debug|x86
+		{D5FFED85-866A-476E-AA2B-32FCDC0D2567}.Debug|Mixed Platforms.ActiveCfg = Debug|x86
+		{D5FFED85-866A-476E-AA2B-32FCDC0D2567}.Debug|Mixed Platforms.Build.0 = Debug|x86
+		{D5FFED85-866A-476E-AA2B-32FCDC0D2567}.Debug|x86.ActiveCfg = Debug|x86
+		{D5FFED85-866A-476E-AA2B-32FCDC0D2567}.Debug|x86.Build.0 = Debug|x86
+		{D5FFED85-866A-476E-AA2B-32FCDC0D2567}.Release|Any CPU.ActiveCfg = Release|x86
+		{D5FFED85-866A-476E-AA2B-32FCDC0D2567}.Release|Mixed Platforms.ActiveCfg = Release|x86
+		{D5FFED85-866A-476E-AA2B-32FCDC0D2567}.Release|Mixed Platforms.Build.0 = Release|x86
+		{D5FFED85-866A-476E-AA2B-32FCDC0D2567}.Release|x86.ActiveCfg = Release|x86
+		{D5FFED85-866A-476E-AA2B-32FCDC0D2567}.Release|x86.Build.0 = Release|x86
+		{03D940E6-D180-47D4-A0AE-2A0B7F4E2054}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{03D940E6-D180-47D4-A0AE-2A0B7F4E2054}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{03D940E6-D180-47D4-A0AE-2A0B7F4E2054}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{03D940E6-D180-47D4-A0AE-2A0B7F4E2054}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{03D940E6-D180-47D4-A0AE-2A0B7F4E2054}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{03D940E6-D180-47D4-A0AE-2A0B7F4E2054}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{03D940E6-D180-47D4-A0AE-2A0B7F4E2054}.Release|Any CPU.Build.0 = Release|Any CPU
+		{03D940E6-D180-47D4-A0AE-2A0B7F4E2054}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{03D940E6-D180-47D4-A0AE-2A0B7F4E2054}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{03D940E6-D180-47D4-A0AE-2A0B7F4E2054}.Release|x86.ActiveCfg = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{3C5CF142-113F-4E50-93D1-A90EEA4AC1CA} = {E13D525A-3A95-4A20-A3BC-41D3762106F0}
+	EndGlobalSection
+EndGlobal
