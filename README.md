@@ -3,6 +3,12 @@ sensu-client.net
 
 An implementation of the sensu client in .NET for those that don't want to drag around a fully Ruby runtime on Windows. I'm not claiming this to be fully featured, but should support some task execution and simple checks.
 
+Based on implementation from Growse
+
+https://github.com/growse/sensu-client.net
+
+
+
 Installation
 ============
 
