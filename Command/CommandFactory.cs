@@ -71,6 +71,7 @@ namespace sensu_client.Command
                     FileName = FileName,
                     Arguments = Arguments,
                     WindowStyle = ProcessWindowStyle.Hidden,
+                    WorkingDirectory = _commandConfiguration.Plugins,
                     UseShellExecute = false,
                     RedirectStandardError = true,
                     RedirectStandardInput = true,

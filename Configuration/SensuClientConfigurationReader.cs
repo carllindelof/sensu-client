@@ -11,26 +11,26 @@ namespace sensu_client.Configuration
 {
     public class SensuClientConfigurationReader : ISensuClientConfigurationReader
     {
+        private readonly IConfigurationPathResolver _configurationPathResolver;
         private ISensuClientConfig _sensuClientConfig;
         private static readonly Logger Log = LogManager.GetCurrentClassLogger();
         static Logger _log;
          
-        private const string Configfilename = "config.json";
-        private const string Configdirname = "conf.d";
+       
         private static string _configfile = "";
         private static string _configdir = "";
         private ReaderWriterLockSlim rwlock;
         private FileSystemWatcher watcher;
 
 
-        public SensuClientConfigurationReader()
+        public SensuClientConfigurationReader(IConfigurationPathResolver configurationPathResolver)
         {
+            _configurationPathResolver = configurationPathResolver;
             _log = LogManager.GetCurrentClassLogger();
-        
-            var  currentDir = Environment.CurrentDirectory;
-
-            _configfile = Path.Combine(currentDir, Configfilename);
-            _configdir = Path.Combine(currentDir, Configdirname);
+            _configfile = configurationPathResolver.ConfigFileName();
+            _configdir = configurationPathResolver.Configdir();
+            _log.Info("Configuration file: {0}", _configfile);
+            _log.Info("Configuration directory: {0}",_configdir);
             rwlock = new ReaderWriterLockSlim();
             InitFileSystemWatcher();
             
@@ -83,6 +83,31 @@ namespace sensu_client.Configuration
                 configsettings = new JObject();
             }
             return configsettings;
+        }
+
+        public JObject MergeCheckWithLocalCheck(JObject check)
+        {
+
+            var checks = SensuClientConfig.Checks;
+
+            if (checks == null) return check;
+            
+            if (!checks.Exists(c => c.Name == check["name"].ToString())) return check;
+
+
+            var configCheck = checks.First(c => c.Name == check["name"].ToString());
+
+            var settings = new JsonSerializerSettings { ContractResolver = new LowercaseContractResolver() };
+            var serializer = JsonSerializer.Create(settings);
+            var localcheck = JObject.FromObject(configCheck, serializer);
+
+            localcheck.Merge(check, new JsonMergeSettings
+            {
+                // union array values together to avoid duplicates
+                MergeArrayHandling = MergeArrayHandling.Merge
+            });
+
+            return localcheck;
         }
 
         private static void GetConfigurations(string configdir, JObject configsettings)

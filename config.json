@@ -1,11 +1,11 @@
 ﻿{
     "rabbitmq": {
 	 "ssl": {
-    	 "private_key_file": "c:\\yourcertpath\\\\client_keycert.p12",
+    	 "private_key_file": "C:\\sensu-client\\files\\client_keycert.p12",
     	 "cert_chain_file": "/etc/sensu/ssl/client_cert.pem",
 		 "cert_pass_phrase": "DemoPass",
     },
-    "host": "192.168.56.22",
+    "host": "10.8.16.67",
     "port": 5671,
     "vhost": "sensu",
     "user": "sensu",

@@ -1,0 +1,16 @@
+{
+  "checks": {
+    "windowsbase_metrics": {
+      "command": "perfmon_windowsbase_metrics.ps1",
+      "interval": 30,
+      "handlers": [
+        "relay"
+      ],
+      "subscribers": [
+        "windows"
+      ],
+      "type": "metric",
+      "standalone": false
+    }
+  }
+}

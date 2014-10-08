@@ -56,6 +56,7 @@ namespace sensu_client.Configuration
         public string[] Subscribers { get; set; }
         public string[] History { get; set; }
         public bool Flapping { get; set; }
+        public bool Standalone { get; set; }
     }
 
     public interface ICheck
@@ -65,6 +66,7 @@ namespace sensu_client.Configuration
         string Command { get; set; }
         int Interval { get; set; }
         string[] Subscribers { get; set; }
+        bool Standalone { get; set; }
     }
 
 

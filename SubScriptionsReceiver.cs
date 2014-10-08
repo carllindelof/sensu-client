@@ -12,6 +12,7 @@ using RabbitMQ.Client.Events;
 using RabbitMQ.Client.Framing.v0_9_1;
 using sensu_client.Command;
 using sensu_client.Configuration;
+using sensu_client.Connection;
 
 namespace sensu_client
 {
@@ -142,6 +143,7 @@ namespace sensu_client
             JToken command;
             if (check.TryGetValue("command", out command))
             {
+                check = _sensuClientConfigurationReader.MergeCheckWithLocalCheck(check);
                 if(!ShouldRunInSafeMode(check))
                 ExecuteCheckCommand(check);
             }
@@ -163,7 +165,6 @@ namespace sensu_client
             {
                 return false;
             }
-
             check["output"] = "Check is not locally defined (safemode)";
             check["status"] = 3;
             check["handle"] = false;
@@ -171,13 +172,14 @@ namespace sensu_client
            
             return true;
         }
-
+       
 
         private void PublishResult(JObject check)
         {
             var payload = new JObject();
             payload["check"] = check;
             payload["client"] = _sensuClientConfigurationReader.SensuClientConfig.Client.Name;
+            payload["check"]["executed"] = CreateTimeStamp();
 
             Log.Info("Publishing Check to sensu server {0} \n", JsonConvert.SerializeObject(payload, SerializerSettings));
             using (var ch = _sensuRabbitMqConnectionFactory.GetRabbitConnection().CreateModel())
@@ -248,6 +250,13 @@ namespace sensu_client
             int outValue;
             return int.TryParse(val, out outValue) ? (int?)outValue : null;
         }
+
+
+        private static long CreateTimeStamp()
+        {
+            return Convert.ToInt64(Math.Round((DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0)).TotalSeconds, MidpointRounding.AwayFromZero));
+        }
+
         private static string SubstitueCommandTokens(JObject check, out List<string> unmatchedTokens)
         {
             var temptokens = new List<string>();

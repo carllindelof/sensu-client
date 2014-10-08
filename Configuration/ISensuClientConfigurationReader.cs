@@ -6,5 +6,7 @@ namespace sensu_client.Configuration
     {
         ISensuClientConfig SensuClientConfig { get; }
         JObject ReadConfigSettingsJson();
+        JObject MergeCheckWithLocalCheck(JObject check);
+
     }
 }

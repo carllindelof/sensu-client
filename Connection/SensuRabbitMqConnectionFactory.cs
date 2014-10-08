@@ -1,12 +1,10 @@
-﻿using System.Linq;
-using System.Net.Security;
+﻿using System.Net.Security;
 using NLog;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Exceptions;
 using sensu_client.Configuration;
-using System.Security.Cryptography.X509Certificates;
 
-namespace sensu_client
+namespace sensu_client.Connection
 {
     public class SensuRabbitMqConnectionFactory : ISensuRabbitMqConnectionFactory
     {

@@ -1,21 +1,13 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Diagnostics;
-using System.Linq;
 using System.ServiceProcess;
-using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading;
 using NLog;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using RabbitMQ.Client.Framing.v0_9_1;
+using Topshelf;
 using sensu_client.Configuration;
 
 namespace sensu_client
 {
-    public class SensuClient : ServiceBase, ISensuClient
+    public class SensuClient : ISensuClient
     {
         private readonly ISensuClientConfigurationReader _sensuClientConfigurationReader;
         private readonly IKeepAliveScheduler _keepAliveScheduler;
@@ -23,25 +15,55 @@ namespace sensu_client
         private static readonly Logger Log = LogManager.GetCurrentClassLogger();
         private static readonly object MonitorObject = new object();
         private ISensuClientConfig _configsettings;
+        private Thread _keepalivethread;
+        private Thread _subscriptionsthread;
 
         public SensuClient(ISensuClientConfigurationReader sensuClientConfigurationReader, IKeepAliveScheduler keepAliveScheduler, ISubScriptionsReceiver subScriptionsReceiver)
         {
             _sensuClientConfigurationReader = sensuClientConfigurationReader;
+
             _keepAliveScheduler = keepAliveScheduler;
             _subScriptionsReceiver = subScriptionsReceiver;
+            _keepalivethread = new Thread(_keepAliveScheduler.KeepAlive);
+            _subscriptionsthread = new Thread(_subScriptionsReceiver.Subscriptions);
+
+            LoadConfiguration();
         }
 
         public void Start()
         {
-            LoadConfiguration();
 
-            //Start Keepalive thread
-            var keepalivethread = new Thread(_keepAliveScheduler.KeepAlive);
-            keepalivethread.Start();
+            try
+            {
+                Log.Info("Inside start service sensu-client ");
 
-            //Start subscriptions thread.
-            var subscriptionsthread = new Thread(_subScriptionsReceiver.Subscriptions);
-            subscriptionsthread.Start();
+
+                Log.Info("Sensu-client configuration loaded!");
+                //Start Keepalive thread
+                _keepalivethread.Start();
+                Log.Info("Sensu-client KeeAliveScheduler started!");
+                //Start subscriptions thread.
+                _subscriptionsthread.Start();
+                Log.Info("Sensu-client Subscription started!");
+            }
+            catch (Exception exception)
+            {
+                Log.Error("Fail on starting ", exception);
+            }
+            
+        }
+
+        public void Stop()
+        {
+            Log.Info("Service OnStop called: Shutting Down");
+            Log.Info("Attempting to obtain lock on monitor");
+            lock (MonitorObject)
+            {
+                Log.Info("lock obtained");
+                _keepAliveScheduler.Stop();
+                _subScriptionsReceiver.Stop();
+                Monitor.Pulse(MonitorObject);
+            }
         }
 
         public void LoadConfiguration()
@@ -54,24 +76,26 @@ namespace sensu_client
             Log.Info("Told to stop. Obeying.");
             Environment.Exit(1);
         }
-        protected override void OnStart(string[] args)
+        protected void OnStart(string[] args)
         {
             Start();
-            base.OnStart(args);
         }
 
-        protected override void OnStop()
+        protected void OnStop()
         {
-            Log.Info("Service OnStop called: Shutting Down");
-            Log.Info("Attempting to obtain lock on monitor");
-            lock (MonitorObject)
-            {
-                Log.Info("lock obtained");
-                _keepAliveScheduler.Stop();
-                _subScriptionsReceiver.Stop();
-                Monitor.Pulse(MonitorObject);
-            }
-            base.OnStop();
+            Stop();
+        }
+
+        public bool Start(HostControl hostControl)
+        {
+            Start();
+            return true;
+        }
+
+        public bool Stop(HostControl hostControl)
+        {
+            Stop();
+            return true;
         }
     }
 }

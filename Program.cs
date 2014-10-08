@@ -1,29 +1,13 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
-using System.Reflection;
-using System.ServiceProcess;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading;
 using NLog;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using RabbitMQ.Client;
-using RabbitMQ.Client.Events;
-using RabbitMQ.Client.Exceptions;
-using RabbitMQ.Client.Framing.v0_9_1;
-using StructureMap;
-using sensu_client.Configuration;
+using Topshelf;
 using Container = StructureMap.Container;
 
 namespace sensu_client
 {
     class Program
     {
+        public const string ServiceName = "Sensu-client";
         static Logger _log;
         static void Main()
         {
@@ -33,23 +17,37 @@ namespace sensu_client
 #endif
             AppDomain.CurrentDomain.UnhandledException += CurrentDomainUnhandledException;
 
-            var container = new Container(new SensuClientRegistry());
-
-            var sensuClient = container.GetInstance<ISensuClient>();
-
-            if (Environment.UserInteractive)
+            try
             {
-                sensuClient.Start();
-                Console.CancelKeyPress += delegate
+                var host = HostFactory.New(x =>
                 {
-                    _log.Info("Cancel Key Pressed. Shutting Down.");
-                };
-            }
-            else
-            {
-                ServiceBase.Run(container.GetInstance<ServiceBase>());
-            }
+                    x.Service<ISensuClient>(s =>
+                    {
+                        s.ConstructUsing(name =>
+                        {
+                            var container = new Container(new SensuClientRegistry());
+                            return container.GetInstance<ISensuClient>();
+                        });
+                        s.WhenStarted(sc => sc.Start());
+                        s.WhenStopped(sc => sc.Stop());
+                    });
+                    x.SetStartTimeout(TimeSpan.FromSeconds(40));
+                    x.SetStopTimeout(TimeSpan.FromSeconds(40));
+                    x.RunAsLocalSystem();
+                    x.SetDisplayName(ServiceName);
+                    x.SetDescription("Sensu client for running checks and metrics for Sensu");
+                    x.SetServiceName(ServiceName);
+                });
 
+                host.Run();
+
+            }
+            catch (Exception exception)
+            {
+                _log.Error("Error in startup sensu-client",exception);
+                
+            }
+            
         }
         static void CurrentDomainUnhandledException(object sender, UnhandledExceptionEventArgs e)
         {

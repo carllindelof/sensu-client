@@ -7,6 +7,7 @@ using Newtonsoft.Json.Linq;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Framing.v0_9_1;
 using sensu_client.Configuration;
+using sensu_client.Connection;
 
 namespace sensu_client
 {

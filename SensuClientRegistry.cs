@@ -12,7 +12,8 @@ namespace sensu_client
         {
             For<ISensuClientConfig>().Use<SensuClientConfig>().Singleton();
             For<ISensuClientConfigurationReader>().Use<SensuClientConfigurationReader>().Singleton();
-            For<ServiceBase>().Use<SensuClient>();
+            For<ISensuClient>().Use<SensuClient>();
+            For<IConfigurationPathResolver>().Use<ConfigurationPathResolver>().Named("ConfigurationPathResolver");
             // ReSharper disable ConvertToLambdaExpression
             Scan(assembly =>
             {

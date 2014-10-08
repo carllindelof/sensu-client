@@ -1,0 +1,16 @@
+{
+  "checks": {
+    "check_cpu_windows": {
+      "command": "check_cpu.ps1 -warn 7 -critical 15",
+      "interval": 30,
+      "handlers": [
+        "relay"
+      ],
+      "subscribers": [
+        "windowschecks"
+      ],
+      "standalone": false,
+      "type": "check"
+    }
+  }
+}
