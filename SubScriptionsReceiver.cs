@@ -29,7 +29,7 @@ namespace sensu_client
         private static readonly JsonSerializerSettings SerializerSettings = new JsonSerializerSettings { Formatting = Formatting.None };
 
 
-        public SubScriptionsReceiver(ISensuClientConfigurationReader sensuClientConfigurationReader,ISensuRabbitMqConnectionFactory sensuRabbitMqConnectionFactory)
+        public SubScriptionsReceiver(ISensuClientConfigurationReader sensuClientConfigurationReader, ISensuRabbitMqConnectionFactory sensuRabbitMqConnectionFactory)
         {
             _sensuClientConfigurationReader = sensuClientConfigurationReader;
             _sensuRabbitMqConnectionFactory = sensuRabbitMqConnectionFactory;
@@ -53,28 +53,25 @@ namespace sensu_client
             QueueingBasicConsumer consumer = null;
             while (Running)
             {
-                if (ch != null && ch.IsOpen && consumer.IsRunning)
-                {
-                    GetPayloadFromOpenChannel(consumer);
-                }
-                else
-                {
-                    ch = CreateChannelAndConsumer(ch, ref consumer);
-                }
-                //Lets us quit while we're still sleeping.
                 lock (MonitorObject)
                 {
+
+                    if (ch != null && ch.IsOpen && consumer.IsRunning)
+                    {
+                        GetPayloadFromOpenChannel(consumer);
+                    }
+                    else
+                    {
+                        ch = CreateChannelAndConsumer(ch, ref consumer);
+                    }
+
                     if (!Running)
                     {
                         Log.Warn("Quitloop set, exiting main loop");
+                        Monitor.Wait(MonitorObject, KeepAliveTimeout);
                         break;
                     }
-                    Monitor.Wait(MonitorObject, KeepAliveTimeout);
-                    if (!Running)
-                    {
-                        Log.Warn("Quitloop set, exiting main loop");
-                        break;
-                    }
+
                 }
             }
         }
@@ -101,7 +98,7 @@ namespace sensu_client
                     }
                     catch (Exception exception)
                     {
-                        Log.Warn(String.Format("Could not bind to subscription: {0}", subscription),  exception);
+                        Log.Warn(String.Format("Could not bind to subscription: {0}", subscription), exception);
                     }
                 }
                 consumer = new QueueingBasicConsumer(ch);
@@ -127,7 +124,7 @@ namespace sensu_client
                 try
                 {
                     var check = JObject.Parse(payload);
-                    Log.Debug("Received check request: {0}",JsonConvert.SerializeObject(check, SerializerSettings));
+                    Log.Debug("Received check request: {0}", JsonConvert.SerializeObject(check, SerializerSettings));
                     ProcessCheck(check);
                 }
                 catch (JsonReaderException)
@@ -144,8 +141,8 @@ namespace sensu_client
             if (check.TryGetValue("command", out command))
             {
                 check = _sensuClientConfigurationReader.MergeCheckWithLocalCheck(check);
-                if(!ShouldRunInSafeMode(check))
-                ExecuteCheckCommand(check);
+                if (!ShouldRunInSafeMode(check))
+                    ExecuteCheckCommand(check);
             }
             else
             {
@@ -156,12 +153,12 @@ namespace sensu_client
         private bool ShouldRunInSafeMode(JObject check)
         {
             var safemode = _sensuClientConfigurationReader.SensuClientConfig.Client.SafeMode;
-            
+
             if (!safemode) return false;
 
             var checks = _sensuClientConfigurationReader.SensuClientConfig.Checks;
 
-            if (checks != null && checks.Exists(c=> c.Name == check["name"].ToString()))
+            if (checks != null && checks.Exists(c => c.Name == check["name"].ToString()))
             {
                 return false;
             }
@@ -169,10 +166,10 @@ namespace sensu_client
             check["status"] = 3;
             check["handle"] = false;
             PublishResult(check);
-           
+
             return true;
         }
-       
+
 
         private void PublishResult(JObject check)
         {
@@ -204,7 +201,7 @@ namespace sensu_client
                 return;
             }
 
-            if(CheckIsInProgress(check))
+            if (CheckIsInProgress(check))
             {
                 Log.Warn("Previous check command execution in progress {0}", check["command"]);
                 return;
@@ -215,7 +212,7 @@ namespace sensu_client
             if (check["timeout"] != null)
                 timeout = TryParseNullable(check["timeout"].ToString());
 
-            var commandToExcecute =CommandFactory.Create(
+            var commandToExcecute = CommandFactory.Create(
                                                     new CommandConfiguration()
                                                         {
                                                             Plugins = _sensuClientConfigurationReader.SensuClientConfig.Client.Plugins,
