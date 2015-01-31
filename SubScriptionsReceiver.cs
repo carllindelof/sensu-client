@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Diagnostics;
+using System.Net;
+using System.Net.NetworkInformation;
 using System.Text;
 using System.Threading;
 using NLog;
@@ -87,13 +87,20 @@ namespace sensu_client
             }
             else
             {
+
+
                 ch = connection.CreateModel();
-                var q = ch.QueueDeclare("", false, false, true, null);
+                var queueName = GetFQDN();
                 foreach (var subscription in _sensuClientConfigurationReader.SensuClientConfig.Client.Subscriptions)
                 {
-                    Log.Debug("Binding queue {0} to exchange {1}", q.QueueName, subscription);
+                    Log.Debug("Binding queue {0} to exchange {1}", queueName, subscription);
                     try
                     {
+                        ch.ExchangeDeclare(subscription, "fanout");
+
+                        var q = ch.QueueDeclare(queueName, false, false, true, null);
+
+
                         ch.QueueBind(q.QueueName, subscription, "");
                     }
                     catch (Exception exception)
@@ -104,23 +111,22 @@ namespace sensu_client
                 consumer = new QueueingBasicConsumer(ch);
                 try
                 {
-                    ch.BasicConsume(q.QueueName, true, consumer);
+                    ch.BasicConsume(queueName, true, consumer);
                 }
                 catch (Exception)
                 {
-                    Log.Warn("Could not consume queue: {0}", q.QueueName);
+                    Log.Warn("Could not consume queue: {0}", queueName);
                 }
             }
             return ch;
         }
-
         private void GetPayloadFromOpenChannel(QueueingBasicConsumer consumer)
         {
             BasicDeliverEventArgs msg;
             consumer.Queue.Dequeue(100, out msg);
             if (msg != null)
             {
-                var payload = Encoding.UTF8.GetString(((BasicDeliverEventArgs)msg).Body);
+                var payload = Encoding.UTF8.GetString(msg.Body);
                 try
                 {
                     var check = JObject.Parse(payload);
@@ -213,7 +219,7 @@ namespace sensu_client
                 timeout = TryParseNullable(check["timeout"].ToString());
 
             var commandToExcecute = CommandFactory.Create(
-                                                    new CommandConfiguration()
+                                                    new CommandConfiguration
                                                         {
                                                             Plugins = _sensuClientConfigurationReader.SensuClientConfig.Client.Plugins,
                                                             TimeOut = timeout
@@ -252,6 +258,19 @@ namespace sensu_client
         private static long CreateTimeStamp()
         {
             return Convert.ToInt64(Math.Round((DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0)).TotalSeconds, MidpointRounding.AwayFromZero));
+        }
+
+        public static string GetFQDN()
+        {
+            string domainName = IPGlobalProperties.GetIPGlobalProperties().DomainName;
+            string hostName = Dns.GetHostName();
+
+            if (!hostName.EndsWith(domainName))  // if hostname does not already include domain name
+            {
+                hostName += "." + domainName;   // add the domain name part
+            }
+
+            return hostName;                    // return the fully qualified name
         }
 
         private static string SubstitueCommandTokens(JObject check, out List<string> unmatchedTokens)
