@@ -1,8 +1,17 @@
-sensu-client.net
+sensu-client
 ================
 
 An implementation of the sensu client in .NET for those that don't want to drag around a fully Ruby runtime on Windows. 
 It should be fully featured, but the test-case we use for production is regular checks pushed from sensu server.
+
+Sensu is a open source monitoring framework
+============
+Information om Sensu http://sensuapp.org/
+Sensu on github: https://github.com/sensu/sensu
+
+Joe Miller writes som really helpful blogposts
+http://www.joemiller.me/2012/01/19/getting-started-with-the-sensu-monitoring-framework/
+http://www.joemiller.me/2013/12/07/sensu-and-graphite-part-2/
 
 Installation
 ============
@@ -32,3 +41,10 @@ Import-Certificate -CertFile "C:\pathtoyourcert\client_keycert.p12" -StoreNames 
 Development
 ===========
 You need to install WiX Toolset 3.9 is released with official support for Visual Studio 2013 editions. It is available for download from http://wixtoolset.org.
+
+Working with sensu
+==========
+
+It is easy to extend sensu on windows using powershell i have some helper methods
+and some examples published on github: https://github.com/carllindelof/sensu-checks
+
