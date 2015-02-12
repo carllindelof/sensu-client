@@ -13,7 +13,7 @@ Download
 ========
 
 Current version 1.0.0:
-https://github.com/carllindelof/sensu-client/releases/download/v0.1.5/sensu-client.msi
+https://github.com/carllindelof/sensu-client/releases/download/v1.0.0/sensu-client.msi
 
 Start running
 =============
