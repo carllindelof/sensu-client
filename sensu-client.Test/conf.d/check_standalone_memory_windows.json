@@ -1,6 +1,6 @@
 {
   "checks": {
-    "check_cpu_windows": {
+    "check_standalone_memory_windows": {
       "command": "check_cpu.ps1 -warn 7 -critical 15",
       "interval": 30,
       "handlers": [
@@ -9,9 +9,8 @@
       "subscribers": [
         "windowschecks"
       ],
-      "standalone": false,
-      "type": "check",
-	  "team": "green"
+      "standalone": true,
+      "type": "check"
     }
   }
 }

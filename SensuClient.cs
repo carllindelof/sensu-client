@@ -2,58 +2,96 @@
 using System.ServiceProcess;
 using System.Threading;
 using NLog;
-using Topshelf;
 using sensu_client.Configuration;
+using sensu_client.StandAlone;
 
 namespace sensu_client
 {
-    public class SensuClient : ISensuClient
+    public class SensuClient : ServiceBase, ISensuClient
     {
         private readonly ISensuClientConfigurationReader _sensuClientConfigurationReader;
-        private readonly IKeepAliveScheduler _keepAliveScheduler;
-        private readonly ISubScriptionsReceiver _subScriptionsReceiver;
+        private static IKeepAliveScheduler _keepAliveScheduler;
+        private static ISubScriptionsReceiver _subScriptionsReceiver;
+        private static ISocketServer _socketServer;
+        private static IStandAloneCheckScheduler _standAloneCheckScheduler;
+
         private static readonly Logger Log = LogManager.GetCurrentClassLogger();
         private static readonly object MonitorObject = new object();
         private ISensuClientConfig _configsettings;
-        private Thread _keepalivethread;
-        private Thread _subscriptionsthread;
+        private static Thread _keepalivethread;
+        private static Thread _subscriptionsthread;
+       
 
-        public SensuClient(ISensuClientConfigurationReader sensuClientConfigurationReader, IKeepAliveScheduler keepAliveScheduler, ISubScriptionsReceiver subScriptionsReceiver)
+        public SensuClient(
+            ISensuClientConfigurationReader sensuClientConfigurationReader, 
+            IKeepAliveScheduler keepAliveScheduler, 
+            ISubScriptionsReceiver subScriptionsReceiver,
+            ISocketServer socketServer,
+            IStandAloneCheckScheduler standAloneCheckScheduler
+            )
         {
-            _sensuClientConfigurationReader = sensuClientConfigurationReader;
+            Log.Debug("sensu-client constructor");
+
+            try
+            {
+                _sensuClientConfigurationReader = sensuClientConfigurationReader;
+            }
+            catch (Exception ex)
+            {
+
+                Log.Error("Error getting configuration reader:", ex);
+            }
+            
+            
+            Log.Debug("sensu-client configuration read!");
 
             _keepAliveScheduler = keepAliveScheduler;
+            Log.Debug("sensu-client keepalive i");
+
             _subScriptionsReceiver = subScriptionsReceiver;
+            _socketServer = socketServer;
+            _standAloneCheckScheduler = standAloneCheckScheduler;
+            Log.Debug("sensu-client subscription");
+
+            _socketServer = socketServer;
+            Log.Debug("sensu-client socket server");
+
+            _standAloneCheckScheduler = standAloneCheckScheduler;
             _keepalivethread = new Thread(_keepAliveScheduler.KeepAlive);
             _subscriptionsthread = new Thread(_subScriptionsReceiver.Subscriptions);
+            Log.Debug("Threads started");
 
             LoadConfiguration();
+            
+            Log.Debug("Configuration loaded");
+
         }
 
-        public void Start()
+        public static void Start()
         {
-
             try
             {
                 Log.Info("Inside start service sensu-client ");
 
-
-                Log.Info("Sensu-client configuration loaded!");
-                //Start Keepalive thread
                 _keepalivethread.Start();
                 Log.Info("Sensu-client KeeAliveScheduler started!");
-                //Start subscriptions thread.
+                
                 _subscriptionsthread.Start();
                 Log.Info("Sensu-client Subscription started!");
+
+                _socketServer.Open();
+                Log.Info("Socket server opened");
+
+                _standAloneCheckScheduler.Start();
+               Log.Info("StandAlone checks started");
             }
             catch (Exception exception)
             {
                 Log.Error("Fail on starting ", exception);
             }
-            
         }
 
-        public void Stop()
+        public new static void Stop()
         {
             Log.Info("Service OnStop called: Shutting Down");
             Log.Info("Attempting to obtain lock on monitor");
@@ -62,13 +100,23 @@ namespace sensu_client
                 Log.Info("lock obtained");
                 _keepAliveScheduler.Stop();
                 _subScriptionsReceiver.Stop();
+                _socketServer.Close();
                 Monitor.Pulse(MonitorObject);
             }
         }
 
         public void LoadConfiguration()
         {
-            _configsettings = _sensuClientConfigurationReader.SensuClientConfig;
+            try
+            {
+                _configsettings = _sensuClientConfigurationReader.SensuClientConfig;
+            }
+            catch (Exception ex)
+            {
+                
+                Log.Error("Error loading configuration:",ex);
+            }
+            
         }
 
         public static void Halt()
@@ -76,26 +124,15 @@ namespace sensu_client
             Log.Info("Told to stop. Obeying.");
             Environment.Exit(1);
         }
-        protected void OnStart(string[] args)
+        protected override void OnStart(string[] args)
         {
             Start();
         }
 
-        protected void OnStop()
+   
+        protected override void OnStop()
         {
             Stop();
-        }
-
-        public bool Start(HostControl hostControl)
-        {
-            Start();
-            return true;
-        }
-
-        public bool Stop(HostControl hostControl)
-        {
-            Stop();
-            return true;
         }
     }
 }

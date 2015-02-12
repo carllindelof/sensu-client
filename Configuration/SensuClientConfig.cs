@@ -13,10 +13,15 @@ namespace sensu_client.Configuration
     public class Client
     {
         private string _plugins = @"c:\opt\sensu\plugins";
+        [JsonProperty("name")]
         public string Name { get; set; }
+        [JsonProperty("address")]
         public string Address { get; set; }
+        [JsonProperty("subscriptions")]
         public string[] Subscriptions { get; set; }
+        [JsonProperty("safemode")]
         public bool SafeMode { get; set; }
+        [JsonProperty("plugins")]
         public string Plugins
         {
             get { return _plugins; }
@@ -44,18 +49,31 @@ namespace sensu_client.Configuration
 
     public class Check : ICheck
     {
+        [JsonProperty("name")]
         public string Name { get; set; }
+        [JsonProperty("issued")]
         public int Issued { get; set; }
+        [JsonProperty("output")]
         public string Output { get; set; }
+        [JsonProperty("status")]
         public int Status { get; set; }
+        [JsonProperty("notification")]
         public string Notification { get; set; }
+        [JsonProperty("handlers")]
         public string[] Handlers { get; set; }
+        [JsonProperty("command")]
         public string Command { get; set; }
+        [JsonProperty("interval")]
         public int Interval { get; set; }
+        [JsonProperty("type")]
         public string Type { get; set; }
+        [JsonProperty("subscribers")]
         public string[] Subscribers { get; set; }
+        [JsonProperty("history")]
         public string[] History { get; set; }
+        [JsonProperty("flapping")]
         public bool Flapping { get; set; }
+        [JsonProperty("standalone")]
         public bool Standalone { get; set; }
     }
 

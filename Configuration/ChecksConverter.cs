@@ -49,6 +49,7 @@ namespace sensu_client.Configuration
                     PropertyInfo targetProperty;
                     var property1 = jsonProperty;
                     var property = propertyNames.FirstOrDefault(k => k.Key.ToLower() == property1.Name.ToLower()).Key;
+                    if(property == null) continue;
 
                     if (propertyNames.TryGetValue(property.ToString(), out targetProperty))
                     {

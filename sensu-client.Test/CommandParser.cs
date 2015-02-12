@@ -5,7 +5,7 @@ using sensu_client.Command;
 namespace sensu_client_test
 {
     [TestFixture]
-    class CommandParserTests
+    class CommandParser
     {
 
         private static CommandConfiguration _configuration;
@@ -62,7 +62,7 @@ namespace sensu_client_test
             command.FileName.ToLower().ShouldContain("ruby.exe");
             command.Arguments.ShouldBe(@"c:\etc\plugins\check-windows-cpu-load.rb", Case.Insensitive);
         }
-        
+    
       
     }
 }

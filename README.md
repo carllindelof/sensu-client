@@ -1,24 +1,19 @@
 sensu-client.net
 ================
 
-An implementation of the sensu client in .NET for those that don't want to drag around a fully Ruby runtime on Windows. I'm not claiming this to be fully featured, but should support some task execution and simple checks.
-
-Based on implementation from Growse
-
-https://github.com/growse/sensu-client.net
-
-
+An implementation of the sensu client in .NET for those that don't want to drag around a fully Ruby runtime on Windows. 
+It should be fully featured, but the test-case we use for production is regular checks pushed from sensu server.
 
 Installation
 ============
 
-The MSI will install a service called 'Sensu Client' and application into `%PROGRAMFILES%`. It provides a sample sensu-compatible json-based config file in the installation directory. Sensu-client.net will then log to `%PROGRAMDATA%\sensu-client.net\logs`.
+The MSI will install a service called 'Sensu Client' and application into `%PROGRAMFILES%`. It provides a sample sensu-compatible json-based config file in the installation directory. Sensu-client will then log to `%PROGRAMDATA%\sensu-client\logs`.
 
 Download
 ========
 
-Releases
-https://github.com/carllindelof/sensu-client/releases
+Current version 1.0.0:
+https://github.com/carllindelof/sensu-client/releases/download/v0.1.5/sensu-client.msi
 
 Start running
 =============
@@ -36,4 +31,4 @@ Import-Certificate -CertFile "C:\pathtoyourcert\client_keycert.p12" -StoreNames 
 
 Development
 ===========
-You need to install WiX Toolset 3.8 is released with official support for Visual Studio 2013 editions. It is available for download from http://wixtoolset.org.
+You need to install WiX Toolset 3.9 is released with official support for Visual Studio 2013 editions. It is available for download from http://wixtoolset.org.

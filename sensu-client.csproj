@@ -41,7 +41,7 @@
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="Newtonsoft.Json, Version=6.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>packages\Newtonsoft.Json.6.0.5\lib\net40\Newtonsoft.Json.dll</HintPath>
+      <HintPath>packages\Newtonsoft.Json.6.0.8\lib\net40\Newtonsoft.Json.dll</HintPath>
     </Reference>
     <Reference Include="NLog, Version=3.1.0.0, Culture=neutral, PublicKeyToken=5120e14c03d0593c, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
@@ -68,34 +68,46 @@
     </Reference>
     <Reference Include="System.Xml">
     </Reference>
-    <Reference Include="Topshelf">
-      <HintPath>packages\Topshelf.3.1.4\lib\net40-full\Topshelf.dll</HintPath>
-    </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CheckProcessor.cs" />
     <Compile Include="Command\CommandConfiguration.cs" />
     <Compile Include="Configuration\ChecksConverter.cs" />
     <Compile Include="Command\CommandFactory.cs" />
+    <Compile Include="Configuration\Configuration.cs" />
     <Compile Include="Configuration\ConfigurationPathResolver.cs" />
     <Compile Include="Configuration\ConfigurationPathResolverTest.cs" />
     <Compile Include="Configuration\IConfigurationPathResolver.cs" />
     <Compile Include="Configuration\LowercaseContractResolver.cs" />
     <Compile Include="Configuration\ISensuClientConfig.cs" />
     <Compile Include="Configuration\ISensuClientConfigurationReader.cs" />
+    <Compile Include="Helpers\CoreAssembly.cs" />
+    <Compile Include="Helpers\SensuClientHelper.cs" />
     <Compile Include="IKeepAliveScheduler.cs" />
+    <Compile Include="StandAlone\IStandAloneCheckScheduler.cs" />
     <Compile Include="ISensuClient.cs" />
     <Compile Include="Connection\ISensuRabbitMqConnectionFactory.cs" />
+    <Compile Include="ISocketServer.cs" />
     <Compile Include="ISubScriptionsReceiver.cs" />
     <Compile Include="KeepAliveScheduler.cs" />
+    <Compile Include="StandAlone\SchedueledItem.cs" />
+    <Compile Include="StandAlone\StandAloneCheckScheduler.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="SensuClient.cs" />
+    <Compile Include="SensuClient.cs">
+      <SubType>Component</SubType>
+    </Compile>
     <Compile Include="Configuration\SensuClientConfig.cs" />
     <Compile Include="Configuration\SensuClientConfigConverter.cs" />
     <Compile Include="Configuration\SensuClientConfigurationReader.cs" />
     <Compile Include="SensuClientRegistry.cs" />
     <Compile Include="Connection\SensuRabbitMqConnectionFactory.cs" />
+    <Compile Include="SocketServer.cs" />
     <Compile Include="SubScriptionsReceiver.cs" />
+    <Compile Include="TcpServer\ITcpServer.cs" />
+    <Compile Include="TcpServer\TcpServer.cs" />
+    <Compile Include="TcpServer\TcpServerConnection.cs" />
+    <Compile Include="UdpReceiver\UdpReciever.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />
@@ -111,6 +123,7 @@
     </None>
     <None Include="packages.config" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="$(SolutionDir)\.nuget\nuget.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

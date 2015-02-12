@@ -1,6 +1,6 @@
 {
   "checks": {
-    "check_cpu_windows": {
+    "check_standalone_cpu_windows": {
       "command": "check_cpu.ps1 -warn 7 -critical 15",
       "interval": 30,
       "handlers": [
@@ -9,9 +9,9 @@
       "subscribers": [
         "windowschecks"
       ],
-      "standalone": false,
+      "standalone": true,
       "type": "check",
-	  "team": "green"
+	  "team": "pink"
     }
   }
 }

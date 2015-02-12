@@ -5,6 +5,7 @@ using NLog;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Threading;
+using sensu_client.Helpers;
 using Timer = System.Timers.Timer;
 
 namespace sensu_client.Configuration
@@ -13,6 +14,7 @@ namespace sensu_client.Configuration
     {
         private readonly IConfigurationPathResolver _configurationPathResolver;
         private ISensuClientConfig _sensuClientConfig;
+        private IConfiguration _configuration;
         private static readonly Logger Log = LogManager.GetCurrentClassLogger();
         static Logger _log;
          
@@ -46,6 +48,16 @@ namespace sensu_client.Configuration
             }
         }
 
+        public IConfiguration Configuration
+        {
+            get
+            {
+                if (_configuration != null) return _configuration;
+                ReadConfigLocked();
+                return _configuration;
+            }
+        }
+
         private ISensuClientConfig LoadConfig()
         {
             using (var reader = new StreamReader(_configfile))
@@ -60,7 +72,12 @@ namespace sensu_client.Configuration
                 }
             }
         }
-
+         private IConfiguration LoadConfiguration()
+         {
+             var configuration = new Configuration();
+             configuration.Config = ReadConfigSettingsJson();
+             return configuration;
+         }
         public JObject ReadConfigSettingsJson()
         {
             JObject configsettings;
@@ -87,19 +104,12 @@ namespace sensu_client.Configuration
 
         public JObject MergeCheckWithLocalCheck(JObject check)
         {
-
-            var checks = SensuClientConfig.Checks;
+            var checks = (JObject)Configuration.Config["checks"];
 
             if (checks == null) return check;
-            
-            if (!checks.Exists(c => c.Name == check["name"].ToString())) return check;
 
-
-            var configCheck = checks.First(c => c.Name == check["name"].ToString());
-
-            var settings = new JsonSerializerSettings { ContractResolver = new LowercaseContractResolver() };
-            var serializer = JsonSerializer.Create(settings);
-            var localcheck = JObject.FromObject(configCheck, serializer);
+            var localcheck = SensuClientHelper.GetCheckByName(check, checks);
+            if (localcheck == null) return check;
 
             localcheck.Merge(check, new JsonMergeSettings
             {
@@ -110,16 +120,21 @@ namespace sensu_client.Configuration
             return localcheck;
         }
 
-        private static void GetConfigurations(string configdir, JObject configsettings)
+        private static void GetConfigurations(string configdir, JObject configSettings)
         {
-            foreach (var settings in Directory.EnumerateFiles(configdir).Select(file => JObject.Parse(File.ReadAllText(file))))
+            foreach (var configFile in Directory.GetFiles(configdir))
             {
-                foreach (var thingemebob in settings)
+                using (var envReader = new StreamReader(configFile))
                 {
-                    configsettings.Add(thingemebob.Key, thingemebob.Value);
+                    using (var envJsonReader = new JsonTextReader(envReader))
+                    {
+                        var current = (JObject) JToken.ReadFrom(envJsonReader);
+                        configSettings.Merge(current, new JsonMergeSettings 
+                                            { MergeArrayHandling = MergeArrayHandling.Merge });
+                    
+                    }
                 }
             }
-          
         }
 
         private void InitFileSystemWatcher()
@@ -153,6 +168,7 @@ namespace sensu_client.Configuration
             {
                 rwlock.EnterWriteLock();
                 _sensuClientConfig = LoadConfig();
+                _configuration = LoadConfiguration();
             }
             finally
             {

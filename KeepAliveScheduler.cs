@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 using NLog;
@@ -8,6 +9,7 @@ using RabbitMQ.Client;
 using RabbitMQ.Client.Framing.v0_9_1;
 using sensu_client.Configuration;
 using sensu_client.Connection;
+using sensu_client.Helpers;
 
 namespace sensu_client
 {
@@ -46,42 +48,11 @@ namespace sensu_client
             {
                 if (ch == null || !ch.IsOpen)
                 {
-                    Log.Error("rMQ Q is closed, Getting connection");
-                    var connection = _connectionFactory.GetRabbitConnection();
-                    if (connection == null)
-                    {
-                        //Do nothing - we'll loop around the while loop again with everything null and retry the connection.
-                    }
-                    else
-                    {
-                        ch = connection.CreateModel();
-                    }
+                    ch = CreateChannel(ch);
                 }
                 if (ch != null && ch.IsOpen)
                 {
-                    var settings = new JsonSerializerSettings {ContractResolver = new LowercaseContractResolver()};
-                    var clientJson = JsonConvert.SerializeObject(_sensuClientConfigurationReader.SensuClientConfig.Client, Formatting.Indented, settings);
-                    
-                    //Valid channel. Good to publish.
-                    var payload = JObject.Parse(clientJson);
-                    payload["timestamp"] = CreateTimeStamp();
-                    payload["plugins"] = "";
-                    Log.Debug("Publishing keepalive");
-                    var properties = new BasicProperties
-                        {
-                            ContentType = "application/octet-stream",
-                            Priority = 0,
-                            DeliveryMode = 1
-                        };
-                    try
-                    {
-                        ch.BasicPublish("", "keepalives", properties, Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(payload)));
-                    }
-                    catch (Exception)
-                    {
-                        Log.Error("Lost MQ connection when trying to publish keepalives!");
-                    }
-                    
+                    PublishKeepAlive(ch);
                 }
                 else
                 {
@@ -105,10 +76,51 @@ namespace sensu_client
                 }
             }
         }
-        private static long CreateTimeStamp()
+
+        private IModel CreateChannel(IModel ch)
         {
-            return Convert.ToInt64(Math.Round((DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0)).TotalSeconds, MidpointRounding.AwayFromZero));
+            Log.Error("rMQ Q is closed, Getting connection");
+
+            var connection = _connectionFactory.GetRabbitConnection();
+            if (connection == null)
+            {
+                //Do nothing - we'll loop around the while loop again with everything null and retry the connection.
+            }
+            else
+            {
+                ch = connection.CreateModel();
+            }
+            return ch;
         }
 
+        private void PublishKeepAlive(IModel ch)
+        {
+            var keepAlive = _sensuClientConfigurationReader.Configuration.Config["client"];
+
+            keepAlive["timestamp"] = SensuClientHelper.CreateTimeStamp();
+            keepAlive["plugins"] = "";
+
+            List<string> redactlist = null;
+
+            redactlist = SensuClientHelper.GetRedactlist((JObject) keepAlive);
+
+            var payload = SensuClientHelper.RedactSensitiveInformaton(keepAlive, redactlist);
+
+            Log.Debug("Publishing keepalive");
+            var properties = new BasicProperties
+                {
+                    ContentType = "application/octet-stream",
+                    Priority = 0,
+                    DeliveryMode = 1
+                };
+            try
+            {
+                ch.BasicPublish("", "keepalives", properties, Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(payload)));
+            }
+            catch (Exception)
+            {
+                Log.Error("Lost MQ connection when trying to publish keepalives!");
+            }
+        }
     }
 }
