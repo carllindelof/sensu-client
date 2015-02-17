@@ -71,7 +71,7 @@ namespace sensu_client
 
         private static string ParseCheckResult(string data)
         {
-            if (data == "ping") return "pong";
+            if (data.TrimEnd('\n') == "ping") return "pong";
 
             JObject check;
             if (!SensuClientHelper.TryParseData(data, out check)) return "Invalid Json!";
