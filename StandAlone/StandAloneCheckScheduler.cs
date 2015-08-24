@@ -74,7 +74,7 @@ namespace sensu_client.StandAlone
             _localCheckSchedulerTimer = new Timer();
 // ReSharper restore UseObjectOrCollectionInitializer
 
-            //Set to every half seccond since the smallest intervall on a check is 1 seccond.
+            //Set to every half second since the smallest intervall on a check is 1 seccond.
             _localCheckSchedulerTimer.Interval = 500;
             _localCheckSchedulerTimer.Elapsed += LocalCheckSchedulerTimer_Elapsed;
             
@@ -100,7 +100,7 @@ namespace sensu_client.StandAlone
         {
             return Task.Factory.StartNew(() =>
             {
-                workItem.Exectue();
+                workItem.Execute();
                 return workItem;
             });
         }

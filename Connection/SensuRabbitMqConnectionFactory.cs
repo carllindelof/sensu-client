@@ -1,4 +1,5 @@
-﻿using System.Net.Security;
+﻿using System;
+using System.Net.Security;
 using NLog;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Exceptions;
@@ -82,5 +83,14 @@ namespace sensu_client.Connection
             return _rabbitMqConnection;
         }
 
+        public void CloseRabbitConnection()
+        {
+            try {
+                _rabbitMqConnection.Close();
+            } catch (AlreadyClosedException)
+            {
+                // ignore.
+            }
+        }
     }
 }

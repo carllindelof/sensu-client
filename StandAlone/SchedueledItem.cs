@@ -18,14 +18,16 @@ namespace sensu_client.StandAlone
             SetNextRunTime();
         }
 
-        public void SetNextRunTime()
+        public void Execute()
+        {
+            _action();
+            SetNextRunTime();
+        }
+
+        private void SetNextRunTime()
         {
             NextRunTime = DateTime.Now.AddSeconds(_interval);
         }
 
-        public void Exectue()
-        {
-            _action();
-        }
     }
 }
