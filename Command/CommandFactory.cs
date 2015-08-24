@@ -27,8 +27,9 @@ namespace sensu_client.Command
 
         public static Command Create(CommandConfiguration commandConfiguration, string command)
         {
-            if (command.ToLower().Contains(".ps1")) return new PowerShellCommand(commandConfiguration, command);
-            if (command.ToLower().Contains(".rb")) return new RubyCommand(commandConfiguration, command);
+            var command_lower = command.ToLower();
+            if (command_lower.Contains(".ps1")) return new PowerShellCommand(commandConfiguration, command);
+            if (command_lower.Contains(".rb") && !command_lower.Contains("ruby.exe") ) return new RubyCommand(commandConfiguration, command);
 
             return new ShellCommand(commandConfiguration, command);
         }
@@ -196,11 +197,12 @@ namespace sensu_client.Command
 
             private static string RubyExePath()
             {
-                //var defaultSensuClientPath = @"c:\opt\sensu\embedded\bin";
-                //if (File.Exists(string.Format("{0}\\ruby.exe", defaultSensuClientPath)))
-                //{
-                //    return string.Format("{0}\\ruby.exe", defaultSensuClientPath);
-                //}
+                var defaultSensuClientPath = @"c:\opt\sensu\embedded\bin";
+                var rubyPath = Path.Combine(defaultSensuClientPath, "ruby.exe");
+                if (File.Exists(rubyPath))
+                {
+                    return rubyPath;
+                }
 
                 return "ruby.exe";
             }

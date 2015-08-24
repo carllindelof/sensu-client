@@ -4,6 +4,7 @@ namespace sensu_client.Connection
 {
     public interface ISensuRabbitMqConnectionFactory
     {
-        IConnection GetRabbitConnection();
+        IModel GetRabbitConnection();
+        void CloseRabbitConnection();
     }
 }
