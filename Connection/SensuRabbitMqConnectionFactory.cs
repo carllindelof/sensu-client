@@ -49,7 +49,7 @@ namespace sensu_client.Connection
             return connectionFactory;
         }
 
-        public IModel GetRabbitConnection()
+        public IConnection GetRabbitConnection()
         {
             //One at a time, please
             lock (Connectionlock)
@@ -80,7 +80,7 @@ namespace sensu_client.Connection
                     }
                 }
             }
-            return _rabbitMqConnection.CreateModel();
+            return _rabbitMqConnection;
         }
 
         public void CloseRabbitConnection()

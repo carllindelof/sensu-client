@@ -117,7 +117,14 @@ namespace sensu_client
         private void GetPayloadFromOpenChannel(QueueingBasicConsumer consumer)
         {
             BasicDeliverEventArgs msg;
-            consumer.Queue.Dequeue(100, out msg);
+            try {
+                consumer.Queue.Dequeue(100, out msg);
+            } catch (Exception e)
+            {
+                Log.Warn(e);
+                _sensuRabbitMqConnectionFactory.CloseRabbitConnection();
+                msg = null; // do not process this pass
+            }
             if (msg != null)
             {
                 var payload = Encoding.UTF8.GetString(((BasicDeliverEventArgs)msg).Body);

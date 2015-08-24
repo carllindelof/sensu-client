@@ -29,7 +29,7 @@ namespace sensu_client.Command
         {
             var command_lower = command.ToLower();
             if (command_lower.Contains(".ps1")) return new PowerShellCommand(commandConfiguration, command);
-            if (command_lower.Contains(".rb") && !command_lower.Contains("ruby.exe") ) return new RubyCommand(commandConfiguration, command);
+            if (command_lower.Contains(".rb")) return new RubyCommand(commandConfiguration, command);
 
             return new ShellCommand(commandConfiguration, command);
         }
