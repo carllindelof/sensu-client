@@ -42,8 +42,6 @@ namespace sensu_client.StandAlone
                 return;
             }
 
-            
-
             foreach (JObject item in standAloneChecks)
             {
                 if (item == null || item["interval"] == null) continue;

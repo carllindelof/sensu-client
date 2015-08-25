@@ -33,14 +33,20 @@ namespace sensu_client.Configuration
 
             if (!Directory.Exists(_configDir)) return config;
 
-            foreach (var configFile in Directory.GetFiles(_configDir))
+            foreach (var configFile in Directory.GetFiles(_configDir, "*.json"))
             {
-                using (var envReader = new StreamReader(configFile))
-                {
-                    using (var envJsonReader = new JsonTextReader(envReader))
+                try {
+                    using (var envReader = new StreamReader(configFile))
                     {
-                        serializer.Populate(envJsonReader, config);
+                        using (var envJsonReader = new JsonTextReader(envReader))
+                        {
+                            serializer.Populate(envJsonReader, config);
+                        }
                     }
+                }
+                catch (Exception e)
+                {
+                    Log.Warn("File {0} has some errors and won't be ignored: {1}", configFile, e);
                 }
             }
 
