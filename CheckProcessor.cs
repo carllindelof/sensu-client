@@ -171,6 +171,7 @@ namespace sensu_client
         {
             return ChecksInProgress.Contains(check["name"].ToString());
         }
+
         private void CheckDidNotHaveValidParameters(JObject check, string commandErrors)
         {
             check["output"] = "Check didn't have valid command: " + commandErrors;
@@ -178,6 +179,7 @@ namespace sensu_client
             check["handle"] = false;
             PublishCheckResult(check);
         }
+
         private void CheckDidNotHaveValidName(JObject check)
         {
             check["output"] = "Check didn't have a valid name";
@@ -185,10 +187,6 @@ namespace sensu_client
             check["handle"] = false;
             PublishCheckResult(check);
         }
-
-       
-
-
       
     }
 }

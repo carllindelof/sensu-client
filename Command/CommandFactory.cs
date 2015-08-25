@@ -3,6 +3,10 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using NLog;
+using System.Collections.Generic;
+using System.Text;
+using System.Globalization;
+using System.Text.RegularExpressions;
 
 namespace sensu_client.Command
 {
@@ -16,11 +20,11 @@ namespace sensu_client.Command
     }
    
     public struct CommandResult 
-{
+    {
         public string Output { get; set; }
         public int Status { get; set; }
         public string Duration { get; set; }
-}
+    }
 
     public static class CommandFactory
     {
@@ -28,6 +32,7 @@ namespace sensu_client.Command
         public static Command Create(CommandConfiguration commandConfiguration, string command)
         {
             var command_lower = command.ToLower();
+            if (command_lower.StartsWith(PerformanceCounterCommand.PREFIX)) return new PerformanceCounterCommand(commandConfiguration, command);
             if (command_lower.Contains(".ps1")) return new PowerShellCommand(commandConfiguration, command);
             if (command_lower.Contains(".rb")) return new RubyCommand(commandConfiguration, command);
 
@@ -37,7 +42,7 @@ namespace sensu_client.Command
 
     public abstract class Command
     {
-        private static readonly Logger Log = LogManager.GetCurrentClassLogger();
+        protected static readonly Logger Log = LogManager.GetCurrentClassLogger();
         protected readonly CommandConfiguration _commandConfiguration;
         protected readonly string _unparsedCommand;
         private string _arguments;
@@ -246,4 +251,175 @@ namespace sensu_client.Command
             }
         }
 
+    public class PerformanceCounterCommand : Command
+    {
+        public static string PREFIX = "!perfcounter> ";
+        private static Dictionary<string, List<PerformanceCounter>> counters = new Dictionary<string, List<PerformanceCounter>>();
+        private static PerformanceCounterRegEx DefaultPerfCounterRegEx = new PerformanceCounterRegEx();
+
+        public PerformanceCounterCommand(CommandConfiguration commandConfiguration, string unparsedCommand) : base(commandConfiguration, unparsedCommand)
+        {
+        }
+
+        public override string FileName
+        {
+            // I'm afraid this method is not required in this Command
+            get
+            {
+                return "";
+            }
+
+            protected internal set {}
+        }
+
+        protected override string ParseArguments()
+        {
+            // retire the magic word
+            return _unparsedCommand.Substring(PREFIX.Length);
+        }
+
+        public override CommandResult Execute()
+        {
+            var result = new CommandResult();
+            var stopwatch = new Stopwatch();
+            result.Status = 0;
+            stopwatch.Start();
+            {
+                string[] splittedArguments = ParseArguments().Split(';');
+                var counterlist = getCounterlist(splittedArguments[0]);
+                var parameters = ParseParameters(splittedArguments);
+
+                var unixTimestamp = (Int32)(DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1))).TotalSeconds;
+                var stdout = new StringBuilder();
+                var stderr = new StringBuilder();
+                string schema;
+                
+                foreach (var counter in counterlist)
+                {
+                    if (parameters.ContainsKey("schema"))
+                        schema = parameters["schema"];
+                    else
+                        schema = String.Format(CultureInfo.InvariantCulture, "{0}.{1}", System.Environment.MachineName, "performance_counter");
+
+                    try
+                    {
+                        var value = counter.NextValue();
+                        stdout.AppendLine(
+                            String.Format(CultureInfo.InvariantCulture, "{0}.{1}.{2} {3:f2} {4}",
+                                schema,
+                                normalizeString(counter.CategoryName),
+                                normalizeString(counter.CounterName.Replace('.', '_').Replace("%", "percent_")).Replace("percent_", "percent."),
+                                value,
+                                unixTimestamp
+                            )
+                        );
+                        if (result.Status == 0) {
+                            if (parameters.ContainsKey("warn") && value > Int32.Parse(parameters["warn"])) {
+                                result.Status = 1;
+                                stderr.AppendLine(String.Format("# WARNING: {0} has value {1} > {2}", counter.ToString(), value, parameters["warn"]));
+                            }
+                            else if (parameters.ContainsKey("error") && value > Int32.Parse(parameters["error"]))
+                            {
+                                result.Status = 1;
+                                stderr.AppendLine(String.Format("# CRITICAL: {0} has value {1} > {2}", counter.ToString(), value, parameters["error"]));
+                            }
+                        }
+                    } catch (Exception e)
+                    {
+                        Log.Warn("Error running performance counter " + counter.CounterName, e);
+                        stderr.AppendLine("# " + e.Message);
+                        result.Status = 2;
+                    }
+                    result.Output = stderr.Append(stdout).ToString().Trim(' ', '_');
+                }
+            }
+            stopwatch.Stop();
+            result.Duration = String.Format("{0:f3}", ((float)stopwatch.ElapsedMilliseconds) / 1000);
+
+            return result;
+        }
+        private string normalizeString(string str)
+        {
+            return Regex.Replace(str, @"[^A-Za-z0-9]+", "_");
+        }
+
+        private List<PerformanceCounter> getCounterlist(string counterName)
+        {
+            if (!counters.ContainsKey(counterName)) {
+                List<System.Diagnostics.PerformanceCounter> counterlist = new List<PerformanceCounter>();
+                var counterData = DefaultPerfCounterRegEx.split(counterName);
+                try {
+                    PerformanceCounterCategory mycat = new PerformanceCounterCategory(counterData.Category);
+                    foreach (var counter in mycat.GetCounters(counterData.Instance))
+                    {
+                        if ( !counter.CounterName.Equals(counterData.Counter, StringComparison.InvariantCultureIgnoreCase))
+                            continue;
+                        counterlist.Add(counter);
+                        counter.NextValue(); // Initialize performance counters in order to avoid them to return 0.
+                    }
+                    counters.Add(counterName, counterlist);
+                }
+                catch (Exception e)
+                {
+                    Log.Error(String.Format("Counter {0} will be ignored due to errors", counterName));
+                    Log.Error(e);
+                }
+
+            }
+            return counters[counterName];
+        }
+
+        private Dictionary<string, string> ParseParameters(string[] split)
+        {
+            Dictionary<string, string> parameters = new Dictionary<string, string>();
+
+            for (var i = 1; i < split.Length; ++i)
+            {
+                var Item = split[i];
+                if (!Item.Contains("="))
+                {
+                    Log.Warn("Invalid format for argument {0}. Ignored.", Item);
+                    continue;
+                }
+                string[] aux = Item.Split(new char[] { '=' }, 2);
+                string key = aux[0].Trim();
+                string value = aux[1].Trim();
+
+                parameters[key] = value;
+            }
+            return parameters;
+        }
+    }
+
+    public class PerformanceCounterRegEx
+    {
+        Regex regex = new Regex(
+            @"^\\?" +
+            @"(?<category>[^\\\(]+)" +
+            @"(?:\(" + @"(?<instance>[^\)]+)" + @"\)\s*)?" +
+            @"\\" + 
+            @"(?<counter>.*)" +
+            @"$"
+        );
+        public PerformanceCounterData split(string pattern)
+        {
+            var result = new PerformanceCounterData();
+            var match = regex.Match(pattern);
+
+            result.Category = match.Groups["category"].Value.Trim();
+            result.Counter = match.Groups["counter"].Value.Trim();
+            if (match.Groups["instance"].Success)
+            {
+                result.Instance = match.Groups["instance"].Value.Trim();
+            }
+            return result;
+        }
+    }
+
+    public class PerformanceCounterData
+    {
+        public string Category { get; set; }
+        public string Counter { get; set; }
+        public string Instance { get; set; }
+    }
 }

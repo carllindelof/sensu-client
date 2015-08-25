@@ -63,6 +63,14 @@ namespace sensu_client_test
             command.Arguments.ShouldBe(@"c:\etc\plugins\check-windows-cpu-load.rb", Case.Insensitive);
         }
     
-      
+        [Test]
+        public void parser_can_parse_performance_counter_with_arguments()
+        {
+            var command = CommandFactory.Create(_configuration, @"!perfcounter> processor(_total)\% processor time; warn=80; critical=90; schema=foo.bar");
+            command.ShouldBeOfType(typeof(PerformanceCounterCommand));
+            command.FileName.ShouldBeEmpty();
+            command.Arguments.ShouldBe(@"processor(_total)\% processor time; warn=80; critical=90; schema=foo.bar");
+        }
+
     }
 }
