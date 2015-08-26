@@ -312,7 +312,7 @@ namespace sensu_client.Command
                                 normalizeString(counter.CategoryName),
                                 normalizeString(counter.CounterName.Replace('.', '_').Replace("%", "_PERCENT_")).Replace("_PERCENT_", "percent."),
                                 "performance_counter");
-                    schema = Regex.Replace(schema, @"_*\._*", @"\.");
+                    schema = Regex.Replace(schema, @"_*\._*", @".");
                     try
                     {
                         var value = counter.NextValue();
