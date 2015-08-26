@@ -299,16 +299,18 @@ namespace sensu_client.Command
                     if (parameters.ContainsKey("schema"))
                         schema = parameters["schema"];
                     else
-                        schema = String.Format(CultureInfo.InvariantCulture, "{0}.{1}", System.Environment.MachineName, "performance_counter");
+                        schema = String.Format(CultureInfo.InvariantCulture, "{0}.{1}.{2}.{3}",
+                                System.Environment.MachineName,
+                                normalizeString(counter.CategoryName),
+                                normalizeString(counter.CounterName.Replace('.', '_').Replace("%", "percent_")).Replace("percent_", "percent."),
+                                "performance_counter");
 
                     try
                     {
                         var value = counter.NextValue();
                         stdout.AppendLine(
-                            String.Format(CultureInfo.InvariantCulture, "{0}.{1}.{2} {3:f2} {4}",
+                            String.Format(CultureInfo.InvariantCulture, "{0} {1:f2} {2}",
                                 schema,
-                                normalizeString(counter.CategoryName),
-                                normalizeString(counter.CounterName.Replace('.', '_').Replace("%", "percent_")).Replace("percent_", "percent."),
                                 value,
                                 unixTimestamp
                             )
