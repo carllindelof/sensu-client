@@ -41,9 +41,7 @@ namespace sensu_client
             }
             catch (Exception exception)
             {
-                _log.Error("Error in startup sensu-client",exception);
-                _log.Error(exception);
-                
+                _log.Error("Error in startup sensu-client: {0}", exception);
             }
             
         }

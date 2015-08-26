@@ -111,6 +111,7 @@ namespace sensu_client.Command
             }
             catch (Win32Exception ex)
             {
+                Log.Warn(ex);
                 result.Output = String.Format("Unexpected error: {0}", ex.Message);
                 result.Status = 2;
             }
@@ -283,6 +284,7 @@ namespace sensu_client.Command
             var result = new CommandResult();
             var stopwatch = new Stopwatch();
             result.Status = 0;
+            result.Output = "No checks were run";
             stopwatch.Start();
             {
                 string[] splittedArguments = ParseArguments().Split(';');
@@ -297,14 +299,20 @@ namespace sensu_client.Command
                 foreach (var counter in counterlist)
                 {
                     if (parameters.ContainsKey("schema"))
-                        schema = parameters["schema"];
+                        schema = normalizeString(
+                            parameters["schema"]
+                                .Replace("{INSTANCE}", counter.InstanceName)
+                                .Replace("{COUNTER}", counter.CounterName)
+                                .Replace("{CATEGORY}", counter.CategoryName)
+                                .Replace("%", "_PERCENT_")
+                        ).Replace("_PERCENT_", "percent.");
                     else
                         schema = String.Format(CultureInfo.InvariantCulture, "{0}.{1}.{2}.{3}",
                                 System.Environment.MachineName,
                                 normalizeString(counter.CategoryName),
-                                normalizeString(counter.CounterName.Replace('.', '_').Replace("%", "percent_")).Replace("percent_", "percent."),
+                                normalizeString(counter.CounterName.Replace('.', '_').Replace("%", "_PERCENT_")).Replace("_PERCENT_", "percent."),
                                 "performance_counter");
-
+                    schema = Regex.Replace(schema, @"_*\._*", @"\.");
                     try
                     {
                         var value = counter.NextValue();
@@ -315,20 +323,13 @@ namespace sensu_client.Command
                                 unixTimestamp
                             )
                         );
+
                         if (result.Status == 0) {
-                            if (parameters.ContainsKey("warn") && value > Int32.Parse(parameters["warn"])) {
-                                result.Status = 1;
-                                stderr.AppendLine(String.Format("# WARNING: {0} has value {1} > {2}", counter.ToString(), value, parameters["warn"]));
-                            }
-                            else if (parameters.ContainsKey("error") && value > Int32.Parse(parameters["error"]))
-                            {
-                                result.Status = 1;
-                                stderr.AppendLine(String.Format("# CRITICAL: {0} has value {1} > {2}", counter.ToString(), value, parameters["error"]));
-                            }
+                            result.Status = getNewStatus(parameters, counter.ToString(), value, stderr);
                         }
                     } catch (Exception e)
                     {
-                        Log.Warn("Error running performance counter " + counter.CounterName, e);
+                        Log.Warn("Error running performance counter {0}:\n {1}", counter.CounterName, e);
                         stderr.AppendLine("# " + e.Message);
                         result.Status = 2;
                     }
@@ -340,9 +341,39 @@ namespace sensu_client.Command
 
             return result;
         }
+
+        private int getNewStatus(Dictionary<string, string> parameters, string name, float value, StringBuilder output)
+        {
+            Boolean ascendent = true;
+            char symbol = '>';
+            if (parameters.ContainsKey("growth") && parameters["growth"].Equals("desc"))
+            {
+                ascendent = false;
+                symbol = '<';
+            }
+
+            if (parameters.ContainsKey("error") && (
+                ( ascendent && value > Int32.Parse(parameters["error"])) ||
+                (!ascendent && value < Int32.Parse(parameters["error"]))
+                ))
+            {
+                output.AppendLine(String.Format("# CRITICAL: {0} has value {1} {3} {2}", name, value, parameters["error"], symbol));
+                return 1;
+            }
+            else if (parameters.ContainsKey("warn") && (
+                ( ascendent && value > Int32.Parse(parameters["warn"])) ||
+                (!ascendent && value < Int32.Parse(parameters["warn"]))
+                ))
+            {
+                output.AppendLine(String.Format("# WARNING: {0} has value {1} {3} {2}", name, value, parameters["warn"], symbol));
+                return 1;
+            }
+            return 0;
+        }
+
         private string normalizeString(string str)
         {
-            return Regex.Replace(str, @"[^A-Za-z0-9]+", "_");
+            return Regex.Replace(str, @"[^A-Za-z0-9\.]+", "_");
         }
 
         private List<PerformanceCounter> getCounterlist(string counterName)
@@ -352,21 +383,34 @@ namespace sensu_client.Command
                 var counterData = DefaultPerfCounterRegEx.split(counterName);
                 try {
                     PerformanceCounterCategory mycat = new PerformanceCounterCategory(counterData.Category);
-                    foreach (var counter in mycat.GetCounters(counterData.Instance))
+                    PerformanceCounter[] allCounters;
+                    if (counterData.Instance == null)
+                        allCounters = mycat.GetCounters();
+                    else if (counterData.Instance.Equals("*")) { 
+                        var names = mycat.GetInstanceNames();
+                        allCounters = new PerformanceCounter[names.Length];
+                        for (int i = 0; i < names.Length; ++i)
+                            allCounters[i] = mycat.GetCounters(names[i])[0];
+                    } else
+                        allCounters = mycat.GetCounters(counterData.Instance);
+
+                    foreach (var counter in allCounters)
                     {
                         if ( !counter.CounterName.Equals(counterData.Counter, StringComparison.InvariantCultureIgnoreCase))
                             continue;
                         counterlist.Add(counter);
                         counter.NextValue(); // Initialize performance counters in order to avoid them to return 0.
                     }
-                    counters.Add(counterName, counterlist);
                 }
                 catch (Exception e)
                 {
                     Log.Error(String.Format("Counter {0} will be ignored due to errors", counterName));
                     Log.Error(e);
                 }
-
+                finally
+                {
+                    counters.Add(counterName, counterlist);
+                }
             }
             return counters[counterName];
         }

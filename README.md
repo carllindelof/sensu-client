@@ -122,4 +122,35 @@ This feature will return the information in a format Graphite-compatible, and wi
 schema value unix_timestamp
 ```
 
+Arguments for `!perfcounter>` command are:
 
+- `warn`: the limit for warnings.
+- `critical`: the limmit for errors.
+- `growth`: can be `asc` (the default), if should alert with values over the limits or `desc` if should alert with values below the limits.
+- `schema`: the stats name. Should be Graphite-compliant.
+
+The `schema` admits different variables, such as:
+- `{INSTANCE}`, which will be replaced by the Performance Counter instance name.
+- `{COUNTER}`, which will be replaced by the Performance Counter name.
+- `{CATEGORY}`, which will be replaced by the Performance Counter category.
+
+They will be normalized in order to avoid names with non-letters or numbers.
+
+Finally, you can use the asterisk `*` to configure **any** instance:
+
+```
+{
+  "checks": {
+    "Windows_CPU": {
+      "command": "!perfcounter> processor(*)\\% processor time; warn=80; critical=90; schema=processor.{INSTANCE}.time",
+      "type": "standard",
+      "standalone": true,
+      "handlers": [
+        "default"
+      ],
+    }
+  }
+}
+```
+
+In this case, it will fail if **any** processor passes the limits.
