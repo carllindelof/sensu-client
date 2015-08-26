@@ -122,17 +122,23 @@ namespace sensu_client.Configuration
 
         private static void GetConfigurations(string configdir, JObject configSettings)
         {
-            foreach (var configFile in Directory.GetFiles(configdir))
+            foreach (var configFile in Directory.GetFiles(configdir, "*.json"))
             {
-                using (var envReader = new StreamReader(configFile))
-                {
-                    using (var envJsonReader = new JsonTextReader(envReader))
+                try {
+                    using (var envReader = new StreamReader(configFile))
                     {
-                        var current = (JObject) JToken.ReadFrom(envJsonReader);
-                        configSettings.Merge(current, new JsonMergeSettings 
-                                            { MergeArrayHandling = MergeArrayHandling.Merge });
-                    
+                        using (var envJsonReader = new JsonTextReader(envReader))
+                        {
+                            var current = (JObject)JToken.ReadFrom(envJsonReader);
+                            configSettings.Merge(current, new JsonMergeSettings
+                            { MergeArrayHandling = MergeArrayHandling.Merge });
+
+                        }
                     }
+                }
+                catch (Exception e)
+                {
+                    Log.Warn("Error while reading JSON file {0} and will be ignored: {1}", configFile, e);
                 }
             }
         }
