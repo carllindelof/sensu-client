@@ -82,7 +82,13 @@ And the checks are stored in `c:\etc\sensu\conf.d directory`. The most important
 }
 ```
 
-The `plugins` keyword may differ from standard Sensu, and it is the path where plugins are going to be run. It *should exist*.
+Special Configuration
+---------------------
+
+It supports standard Sensu keywords, but has some extra keys:
+
+* `plugins`: The path where plugins are going to be run. It *should exist*.
+* `send_metric_with_check`: Sends a metric in addition to checks. This is useful to track metrics and send alerts in one step.
 
 Special commands
 ----------------

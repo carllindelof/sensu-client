@@ -12,7 +12,9 @@ namespace sensu_client.Configuration
 
     public class Client
     {
-        private string _plugins = @"c:\opt\sensu\plugins";
+        private string _plugins = @"c:\";
+        private bool _send_metric_with_check = false;
+
         [JsonProperty("name")]
         public string Name { get; set; }
         [JsonProperty("address")]
@@ -26,6 +28,12 @@ namespace sensu_client.Configuration
         {
             get { return _plugins; }
             set { _plugins = value; }
+        }
+        [JsonProperty("send_metric_with_check")]
+        public bool SendMetricWithCheck
+        {
+            get { return _send_metric_with_check; }
+            set { _send_metric_with_check = value; }
         }
     }
 
