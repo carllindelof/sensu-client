@@ -1,9 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading;
 using System.Threading.Tasks;
 using NLog;
 using Newtonsoft.Json;
@@ -11,7 +8,6 @@ using Newtonsoft.Json.Linq;
 using sensu_client.Command;
 using sensu_client.Configuration;
 using sensu_client.Connection;
-using RabbitMQ.Client;
 using RabbitMQ.Client.Framing.v0_9_1;
 using sensu_client.Helpers;
 
@@ -83,14 +79,29 @@ namespace sensu_client
             payload["client"] = _sensuClientConfigurationReader.SensuClientConfig.Client.Name;
             payload["check"]["executed"] = SensuClientHelper.CreateTimeStamp();
 
-            Log.Info("Publishing Check to sensu server {0} \n", JsonConvert.SerializeObject(payload, SerializerSettings));
-            PublishResult(payload);
-            if (ChecksInProgress.Contains(check["name"].ToString()))
-                ChecksInProgress.Remove(check["name"].ToString());
+            try
+            {
+                PublishResult(payload);
+
+                if (_sensuClientConfigurationReader.SensuClientConfig.Client.SendMetricWithCheck && ((string)check["type"]).Equals("standard"))
+                {
+                    // publish the same result as metric too
+                    payload["check"]["type"] = "metric";
+                    PublishResult(payload);
+                }
+            }
+            finally
+            {
+                var name = check["name"].ToString();
+                if (ChecksInProgress.Contains(name))
+                    ChecksInProgress.Remove(name);
+            }
         }
 
         public void PublishResult(JObject payload)
         {
+            var json = JsonConvert.SerializeObject(payload);
+            Log.Info("Publishing Check to sensu server {0} \n", json);
             using (var ch = _connectionFactory.GetRabbitConnection().CreateModel())
             {
                 var properties = new BasicProperties
@@ -99,7 +110,7 @@ namespace sensu_client
                         Priority = 0,
                         DeliveryMode = 1
                     };
-                ch.BasicPublish("", "results", properties, Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(payload)));
+                ch.BasicPublish("", "results", properties, Encoding.UTF8.GetBytes(json));
             }
         }
 
@@ -141,7 +152,7 @@ namespace sensu_client
 
             Log.Debug("About to run command: " + commandToExcecute.Arguments);
             
-            Task<JObject> executingTask =  ExecuteCheck(check,commandToExcecute);
+            Task<JObject> executingTask =  ExecuteCheck(check, commandToExcecute);
             executingTask.ContinueWith(ReportCheckResultAfterCompletion);
 
         }

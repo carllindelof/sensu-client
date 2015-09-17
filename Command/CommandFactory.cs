@@ -13,17 +13,17 @@ namespace sensu_client.Command
 
     public static class CommandProviders
     {
-        public static string  PowerShell = "powershell";
+        public static string PowerShell = "powershell";
         public static string Ruby = "ruby";
         public static string Cmd = "cmd";
 
     }
-   
-    public struct CommandResult 
+
+    public struct CommandResult
     {
         public string Output { get; set; }
         public int Status { get; set; }
-        public string Duration { get; set; }
+        public float Duration { get; set; }
     }
 
     public static class CommandFactory
@@ -52,7 +52,7 @@ namespace sensu_client.Command
             _commandConfiguration = commandConfiguration;
             _unparsedCommand = unparsedCommand;
         }
-
+        
         public abstract string FileName { get; protected internal set; }
 
         public virtual string Arguments
@@ -73,76 +73,93 @@ namespace sensu_client.Command
         {
             var result = new CommandResult();
             var processstartinfo = new ProcessStartInfo()
-                {
-                    FileName = FileName,
-                    Arguments = Arguments,
-                    WindowStyle = ProcessWindowStyle.Hidden,
-                    WorkingDirectory = _commandConfiguration.Plugins,
-                    UseShellExecute = false,
-                    RedirectStandardError = true,
-                    RedirectStandardInput = true,
-                    RedirectStandardOutput = true
-                };
-            var process = new Process {StartInfo = processstartinfo};
+            {
+                FileName = FileName,
+                Arguments = Arguments,
+                WindowStyle = ProcessWindowStyle.Hidden,
+                WorkingDirectory = _commandConfiguration.Plugins,
+                UseShellExecute = false,
+                RedirectStandardError = true,
+                RedirectStandardInput = true,
+                RedirectStandardOutput = true
+            };
+            var process = new Process { StartInfo = processstartinfo };
             var stopwatch = new Stopwatch();
             try
             {
                 stopwatch.Start();
                 process.Start();
-                var output = process.StandardOutput.ReadToEnd();
-                var errors = process.StandardError.ReadToEnd();
-                var status = process.ExitCode;
                 if (_commandConfiguration.TimeOut.HasValue)
                 {
-                    if (!process.WaitForExit(1000*_commandConfiguration.TimeOut.Value))
+                    if (!process.WaitForExit(1000 * _commandConfiguration.TimeOut.Value))
                     {
+                        Log.Debug("Process to be killed {0}", FileName);
                         process.Kill();
                     }
                 }
                 else
                 {
                     process.WaitForExit();
-                    process.Close();
                 }
 
-                result.Output = String.Format("{0}{1}", output,errors);
+                var output = process.StandardOutput.ReadToEnd();
+                var errors = process.StandardError.ReadToEnd();
+                var status = process.ExitCode;
+                result.Output = String.Format("{0}{1}", output, errors);
                 result.Status = status;
-                if (!string.IsNullOrEmpty(errors)) Log.Error("Error when executing command: {0} \n resulted in: {1} \n", Arguments,errors);
+                if (!string.IsNullOrEmpty(errors))
+                {
+                    Log.Error(
+                        "Error when executing command: '{0}' on '{1}' \n resulted in: {2} \n",
+                        _unparsedCommand,
+                        _commandConfiguration.Plugins,
+                        errors
+                        );
+                }
             }
-            catch (Win32Exception ex)
+            catch (Exception ex)
             {
-                Log.Warn(ex);
+                Log.Warn(
+                    "Unexpected error when executing command: '{0}' on '{2}' \n {1} \n",
+                    _unparsedCommand,
+                    ex,
+                    _commandConfiguration.Plugins
+                    );
                 result.Output = String.Format("Unexpected error: {0}", ex.Message);
                 result.Status = 2;
             }
+            finally
+            {
+                process.Close();
+            }
             stopwatch.Stop();
-            result.Duration = String.Format("{0:f3}", ((float) stopwatch.ElapsedMilliseconds)/1000);
+            result.Duration = ((float)stopwatch.ElapsedMilliseconds) / 1000;
             return result;
 
         }
     }
 
     public class PowerShellCommand : Command
+    {
+        private string _fileName;
+        private string _arguments;
+        const string PowershellOptions = "-NoProfile -NonInteractive -NoLogo -ExecutionPolicy Bypass ";
+
+        public PowerShellCommand(CommandConfiguration commandConfiguration, string unparsedCommand) : base(commandConfiguration, unparsedCommand)
         {
-            private string _fileName;
-            private string _arguments;
-            const string PowershellOptions = "-NoProfile -NonInteractive -NoLogo -ExecutionPolicy Bypass ";
-            
-            public PowerShellCommand(CommandConfiguration commandConfiguration, string unparsedCommand): base(commandConfiguration,unparsedCommand)
-            {
-            }
+        }
 
-            public override string FileName
+        public override string FileName
+        {
+            get
             {
-                get
-                {
-                    if (!String.IsNullOrEmpty(_fileName)) return _fileName;
+                if (!String.IsNullOrEmpty(_fileName)) return _fileName;
 
-                    _fileName = GetPowerShellExePath();
-                    return _fileName;
-                }
-                protected internal set { _fileName = value; }
+                _fileName = GetPowerShellExePath();
+                return _fileName;
             }
+            protected internal set { _fileName = value; }
+        }
 
         private static string GetPowerShellExePath()
         {
@@ -159,98 +176,111 @@ namespace sensu_client.Command
         }
 
         public override string Arguments
+        {
+            get
             {
-                get { 
-                    if (!String.IsNullOrEmpty(_arguments)) return _arguments;
+                if (!String.IsNullOrEmpty(_arguments)) return _arguments;
 
-                        _arguments = ParseArguments();
+                _arguments = ParseArguments();
                 return _arguments;
-                }
-                protected internal set { _arguments = value; }
             }
+            protected internal set { _arguments = value; }
+        }
 
-         protected override string ParseArguments()
+        protected override string ParseArguments()
         {
             int lastSlash = _unparsedCommand.LastIndexOf('/');
             var powershellargument = (lastSlash > -1) ? _unparsedCommand.Substring(lastSlash + 1) : _unparsedCommand;
             return String.Format("{0} -FILE {1}\\{2}", PowershellOptions, _commandConfiguration.Plugins, powershellargument);
         }
-     }
+    }
 
-        public class RubyCommand : Command
+    public class RubyCommand : Command
+    {
+        //string envRubyPath = Environment.GetEnvironmentVariable("RUBYPATH");
+        private string _fileName;
+        private string _arguments;
+
+        public RubyCommand(CommandConfiguration commandConfiguration, string unparsedCommand)
+            : base(commandConfiguration, unparsedCommand)
         {
-            //string envRubyPath = Environment.GetEnvironmentVariable("RUBYPATH");
-            private string _fileName;
-            private string _arguments;
+        }
 
-            public RubyCommand(CommandConfiguration commandConfiguration, string unparsedCommand)
-                : base(commandConfiguration, unparsedCommand)
+
+        public override string FileName
+        {
+            get
             {
+                if (!String.IsNullOrEmpty(_fileName)) return _fileName;
+
+                _fileName = RubyExePath();
+                return _fileName;
+            }
+            protected internal set { _fileName = value; }
+        }
+
+        private static string RubyExePath()
+        {
+            var defaultSensuClientPath = @"c:\opt\sensu\embedded\bin";
+            var rubyPath = Path.Combine(defaultSensuClientPath, "ruby.exe");
+            if (File.Exists(rubyPath))
+            {
+                return rubyPath;
             }
 
-   
-            public override string FileName
-            {
-                get
-                {
-                    if (!String.IsNullOrEmpty(_fileName)) return _fileName;
+            return "ruby.exe";
+        }
 
-                    _fileName = RubyExePath();
-                    return _fileName;
-                }
-                protected internal set { _fileName = value; }
+        public override string Arguments
+        {
+            get
+            {
+                if (!String.IsNullOrEmpty(_arguments)) return _arguments;
+
+                _arguments = ParseArguments();
+                return _arguments;
             }
+            protected internal set { _arguments = value; }
+        }
 
-            private static string RubyExePath()
+
+        protected override string ParseArguments()
+        {
+            int lastSlash = _unparsedCommand.LastIndexOf('/');
+            var rubyArgument = (lastSlash > -1) ? _unparsedCommand.Substring(lastSlash + 1) : _unparsedCommand;
+            return String.Format("{0}\\{1}", _commandConfiguration.Plugins, rubyArgument);
+        }
+    }
+
+    public class ShellCommand : Command
+    {
+        protected string _filename;
+        protected string _arguments;
+
+        public ShellCommand(CommandConfiguration commandConfiguration, string unparsedCommand) : base(commandConfiguration, unparsedCommand)
+        {
+            var cmd = unparsedCommand.Split(new char[] { ' ' }, 2);
+            _filename = cmd[0];
+            if (cmd.Length > 1)
+                _arguments = cmd[1];
+        }
+
+        public override string FileName
+        {
+            protected internal set { _filename = value; }
+       
+            get
             {
-                var defaultSensuClientPath = @"c:\opt\sensu\embedded\bin";
-                var rubyPath = Path.Combine(defaultSensuClientPath, "ruby.exe");
-                if (File.Exists(rubyPath))
-                {
-                    return rubyPath;
-                }
-
-                return "ruby.exe";
-            }
-
-            public override string Arguments
-            {
-                get { 
-                    if (!String.IsNullOrEmpty(_arguments)) return _arguments;
-
-                        _arguments = ParseArguments();
-                         return _arguments;
-                }
-                protected internal set { _arguments = value; }
-            }
-
-
-            protected override string ParseArguments()
-            {
-                int lastSlash = _unparsedCommand.LastIndexOf('/');
-                var rubyArgument = (lastSlash > -1) ? _unparsedCommand.Substring(lastSlash + 1) : _unparsedCommand;
-                return String.Format("{0}\\{1}", _commandConfiguration.Plugins, rubyArgument);
+                return _filename;                
             }
         }
-        public class ShellCommand : Command
-        {
-            private string _fileName = String.Format("{0}\\cmd.exe",Environment.SystemDirectory);
-           
-            public ShellCommand(CommandConfiguration commandConfiguration, string unparsedCommand): base(commandConfiguration, unparsedCommand)
-            {
-            }
-     
-            public override string FileName
-            {
-                get { return _fileName; }
-                protected internal set { _fileName = value; }
-            }
 
-            protected override string ParseArguments()
-            {
-                return String.Format("'{0}'", _unparsedCommand);
-            }
+        protected override string ParseArguments()
+        {
+            return _arguments;
         }
+    }
+    
 
     public class PerformanceCounterCommand : Command
     {
@@ -270,7 +300,7 @@ namespace sensu_client.Command
                 return "";
             }
 
-            protected internal set {}
+            protected internal set { }
         }
 
         protected override string ParseArguments()
@@ -295,7 +325,7 @@ namespace sensu_client.Command
                 var stdout = new StringBuilder();
                 var stderr = new StringBuilder();
                 string schema;
-                
+
                 foreach (var counter in counterlist)
                 {
                     if (parameters.ContainsKey("schema"))
@@ -316,18 +346,20 @@ namespace sensu_client.Command
                     try
                     {
                         var value = counter.NextValue();
-                        stdout.AppendLine(
-                            String.Format(CultureInfo.InvariantCulture, "{0} {1:f2} {2}",
+                        stdout.Append(
+                            String.Format(CultureInfo.InvariantCulture, "{0} {1:f2} {2}\n",
                                 schema,
                                 value,
                                 unixTimestamp
                             )
                         );
 
-                        if (result.Status == 0) {
+                        if (result.Status == 0)
+                        {
                             result.Status = getNewStatus(parameters, counter.ToString(), value, stderr);
                         }
-                    } catch (Exception e)
+                    }
+                    catch (Exception e)
                     {
                         Log.Warn("Error running performance counter {0}:\n {1}", counter.CounterName, e);
                         stderr.AppendLine("# " + e.Message);
@@ -337,7 +369,7 @@ namespace sensu_client.Command
                 }
             }
             stopwatch.Stop();
-            result.Duration = String.Format("{0:f3}", ((float)stopwatch.ElapsedMilliseconds) / 1000);
+            result.Duration = ((float)stopwatch.ElapsedMilliseconds) / 1000;
 
             return result;
         }
@@ -353,16 +385,16 @@ namespace sensu_client.Command
             }
 
             if (parameters.ContainsKey("error") && (
-                ( ascendent && value > Int32.Parse(parameters["error"])) ||
-                (!ascendent && value < Int32.Parse(parameters["error"]))
+                (ascendent && value > Int64.Parse(parameters["error"])) ||
+                (!ascendent && value < Int64.Parse(parameters["error"]))
                 ))
             {
                 output.AppendLine(String.Format("# CRITICAL: {0} has value {1} {3} {2}", name, value, parameters["error"], symbol));
                 return 1;
             }
             else if (parameters.ContainsKey("warn") && (
-                ( ascendent && value > Int32.Parse(parameters["warn"])) ||
-                (!ascendent && value < Int32.Parse(parameters["warn"]))
+                (ascendent && value > Int64.Parse(parameters["warn"])) ||
+                (!ascendent && value < Int64.Parse(parameters["warn"]))
                 ))
             {
                 output.AppendLine(String.Format("# WARNING: {0} has value {1} {3} {2}", name, value, parameters["warn"], symbol));
@@ -373,38 +405,69 @@ namespace sensu_client.Command
 
         private string normalizeString(string str)
         {
-            return Regex.Replace(str, @"[^A-Za-z0-9\.]+", "_");
+            return Regex.Replace(str, @"[^A-Za-z0-9\.\-]+", "_");
         }
 
         private List<PerformanceCounter> getCounterlist(string counterName)
         {
-            if (!counters.ContainsKey(counterName)) {
+            if (!counters.ContainsKey(counterName))
+            {
                 List<System.Diagnostics.PerformanceCounter> counterlist = new List<PerformanceCounter>();
                 var counterData = DefaultPerfCounterRegEx.split(counterName);
-                try {
+                try
+                {
                     PerformanceCounterCategory mycat = new PerformanceCounterCategory(counterData.Category);
-                    PerformanceCounter[] allCounters;
-                    if (counterData.Instance == null)
-                        allCounters = mycat.GetCounters();
-                    else if (counterData.Instance.Equals("*")) { 
-                        var names = mycat.GetInstanceNames();
-                        allCounters = new PerformanceCounter[names.Length];
-                        for (int i = 0; i < names.Length; ++i)
-                            allCounters[i] = mycat.GetCounters(names[i])[0];
-                    } else
-                        allCounters = mycat.GetCounters(counterData.Instance);
-
-                    foreach (var counter in allCounters)
+                    var foo = PerformanceCounterCategory.GetCategories();
+                    var foolist = new List<string>();
+                    foreach (var f in foo)
                     {
-                        if ( !counter.CounterName.Equals(counterData.Counter, StringComparison.InvariantCultureIgnoreCase))
-                            continue;
-                        counterlist.Add(counter);
-                        counter.NextValue(); // Initialize performance counters in order to avoid them to return 0.
+                        foolist.Add(f.CategoryName);
                     }
+                    foolist.Sort();
+                    switch (mycat.CategoryType)
+                    {
+                        case PerformanceCounterCategoryType.SingleInstance:
+                            foreach (var counter in mycat.GetCounters())
+                            {
+                                if (!counter.CounterName.Equals(counterData.Counter, StringComparison.InvariantCultureIgnoreCase))
+                                    continue;
+                                counterlist.Add(counter);
+                                counter.NextValue(); // Initialize performance counters in order to avoid them to return 0.
+                            }
+                            break;
+                        case PerformanceCounterCategoryType.MultiInstance:
+                            if (counterData.Instance == null || counterData.Instance.Equals("*"))
+                            {
+                                foreach (var instance in mycat.GetInstanceNames())
+                                {
+                                    foreach (var counter in mycat.GetCounters(instance))
+                                    {
+                                        if (!counter.CounterName.Equals(counterData.Counter, StringComparison.InvariantCultureIgnoreCase))
+                                            continue;
+                                        counterlist.Add(counter);
+                                        counter.NextValue(); // Initialize performance counters in order to avoid them to return 0.
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                foreach (var counter in mycat.GetCounters(counterData.Instance))
+                                {
+                                    if (!counter.CounterName.Equals(counterData.Counter, StringComparison.InvariantCultureIgnoreCase))
+                                        continue;
+                                    counterlist.Add(counter);
+                                    counter.NextValue(); // Initialize performance counters in order to avoid them to return 0.
+                                }
+                            }
+                            break;
+                        default:
+                            break;
+                    }
+
                 }
                 catch (Exception e)
                 {
-                    Log.Error(String.Format("Counter {0} will be ignored due to errors", counterName));
+                    Log.Error(String.Format("Counter {0} will be ignored due to errors: {1}", counterName, e));
                     Log.Error(e);
                 }
                 finally
@@ -437,13 +500,14 @@ namespace sensu_client.Command
         }
     }
 
+    
     public class PerformanceCounterRegEx
     {
         Regex regex = new Regex(
             @"^\\?" +
             @"(?<category>[^\\\(]+)" +
             @"(?:\(" + @"(?<instance>[^\)]+)" + @"\)\s*)?" +
-            @"\\" + 
+            @"\\" +
             @"(?<counter>.*)" +
             @"$"
         );
