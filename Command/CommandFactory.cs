@@ -23,7 +23,6 @@ namespace sensu_client.Command
     {
         public string Output { get; set; }
         public int Status { get; set; }
-        public float Duration { get; set; }
     }
 
     public static class CommandFactory
@@ -84,10 +83,8 @@ namespace sensu_client.Command
                 RedirectStandardOutput = true
             };
             var process = new Process { StartInfo = processstartinfo };
-            var stopwatch = new Stopwatch();
             try
             {
-                stopwatch.Start();
                 process.Start();
                 if (_commandConfiguration.TimeOut.HasValue)
                 {
@@ -132,8 +129,6 @@ namespace sensu_client.Command
             {
                 process.Close();
             }
-            stopwatch.Stop();
-            result.Duration = ((float)stopwatch.ElapsedMilliseconds) / 1000;
             return result;
 
         }
@@ -312,10 +307,8 @@ namespace sensu_client.Command
         public override CommandResult Execute()
         {
             var result = new CommandResult();
-            var stopwatch = new Stopwatch();
             result.Status = 0;
             result.Output = "No checks were run";
-            stopwatch.Start();
             {
                 string[] splittedArguments = ParseArguments().Split(';');
                 var counterlist = getCounterlist(splittedArguments[0]);
@@ -368,8 +361,6 @@ namespace sensu_client.Command
                     result.Output = stderr.Append(stdout).ToString().Trim(' ', '_');
                 }
             }
-            stopwatch.Stop();
-            result.Duration = ((float)stopwatch.ElapsedMilliseconds) / 1000;
 
             return result;
         }

@@ -50,22 +50,34 @@ namespace sensu_client
             QueueingBasicConsumer consumer = null;
             while (Running)
             {
-                lock (MonitorObject)
+                try
                 {
-                    if (ch != null && ch.IsOpen && consumer.IsRunning)
+                    lock (MonitorObject)
                     {
-                        GetPayloadFromOpenChannel(consumer);
+                        if (ch != null && ch.IsOpen && consumer.IsRunning)
+                        {
+                            GetPayloadFromOpenChannel(consumer);
+                        }
+                        else
+                        {
+                            if (ch != null && ch.IsClosed)
+                                Log.Error("rMQ Channel is closed, Getting connection");
+                            else if (consumer != null && !consumer.IsRunning)
+                                Log.Error("rMQ Consummer is closed, Getting connection");
+                            ch = CreateChannelAndConsumer(ch, ref consumer);
+                        }
+                        if (!Running)
+                        {
+                            Log.Info("Quitloop set, exiting main loop");
+                            Monitor.Wait(MonitorObject, KeepAliveTimeout);
+                            break;
+                        }
                     }
-                    else
-                    {
-                        ch = CreateChannelAndConsumer(ch, ref consumer);
-                    }
-                    if (!Running)
-                    {
-                        Log.Warn("Quitloop set, exiting main loop");
-                        Monitor.Wait(MonitorObject, KeepAliveTimeout);
-                        break;
-                    }
+                }
+                catch (Exception e)
+                {
+                    Log.Warn(e, "Exception on Subscriptions thread");
+                    Thread.Sleep(20000);
                 }
             }
         }
@@ -73,7 +85,6 @@ namespace sensu_client
 
         private IModel CreateChannelAndConsumer(IModel ch, ref QueueingBasicConsumer consumer)
         {
-            Log.Error("rMQ Q is closed, Getting connection");
             var connection = _sensuRabbitMqConnectionFactory.GetRabbitConnection();
             if (connection == null)
             {
@@ -96,7 +107,7 @@ namespace sensu_client
                     }
                     catch (Exception exception)
                     {
-                        Log.Warn(String.Format("Could not bind to subscription: {0}", subscription),  exception);
+                        Log.Warn(exception, "Could not bind to subscription: {0}", subscription);
                     }
                 }
                 consumer = new QueueingBasicConsumer(ch);

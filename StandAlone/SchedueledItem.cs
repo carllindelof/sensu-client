@@ -1,4 +1,5 @@
 using System;
+using NLog;
 
 namespace sensu_client.StandAlone
 {
@@ -8,6 +9,7 @@ namespace sensu_client.StandAlone
         private readonly Action _action;
         public readonly int _interval;
         public DateTime NextRunTime;
+        private static readonly Logger Log = LogManager.GetCurrentClassLogger();
         public string Key { get { return _key; } }
 
         public SchedueledItem(Action action, string key, int interval)
@@ -20,7 +22,14 @@ namespace sensu_client.StandAlone
 
         public void Execute()
         {
-            _action();
+            try
+            {
+                _action();
+            }
+            catch (Exception e)
+            {
+                Log.Warn(e, "The task {0} failed", _key);
+            }
             SetNextRunTime();
         }
 

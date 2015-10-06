@@ -46,41 +46,47 @@ namespace sensu_client
             Log.Debug("Starting keepalive scheduler thread");
             while (Running)
             {
-                if (ch == null || !ch.IsOpen)
-                {
-                    ch = CreateChannel(ch);
-                }
-                if (ch != null && ch.IsOpen)
-                {
-                    PublishKeepAlive(ch);
-                }
-                else
-                {
-                    Log.Error("Valiant attempts to get a valid rMQ connection were in vain. Skipping this keepalive loop.");
-                }
+                try {
+                    if (ch == null || !ch.IsOpen)
+                    {
+                        if (ch != null && !ch.IsOpen)
+                            Log.Error("rMQ Q is closed, Getting connection");
+                        ch = CreateChannel(ch);
+                    }
+                    if (ch != null && ch.IsOpen)
+                    {
+                        PublishKeepAlive(ch);
+                    }
+                    else
+                    {
+                        Log.Error("Valiant attempts to get a valid rMQ connection were in vain. Skipping this keepalive loop.");
+                    }
 
-                //Lets us quit while we're still sleeping.
-                lock (MonitorObject)
+                    //Lets us quit while we're still sleeping.
+                    lock (MonitorObject)
+                    {
+                        if (!Running)
+                        {
+                            Log.Warn("Quitloop set, exiting main loop");
+                            break;
+                        }
+                        Monitor.Wait(MonitorObject, KeepAliveTimeout);
+                        if (!Running)
+                        {
+                            Log.Warn("Quitloop set, exiting main loop");
+                            break;
+                        }
+                    }
+                } catch (Exception e)
                 {
-                    if (!Running)
-                    {
-                        Log.Warn("Quitloop set, exiting main loop");
-                        break;
-                    }
-                    Monitor.Wait(MonitorObject, KeepAliveTimeout);
-                    if (!Running)
-                    {
-                        Log.Warn("Quitloop set, exiting main loop");
-                        break;
-                    }
+                    Log.Warn(e, "Exception on KeepAlive thread");
+                    Thread.Sleep(20000);
                 }
             }
         }
 
         private IModel CreateChannel(IModel ch)
         {
-            Log.Error("rMQ Q is closed, Getting connection");
-
             var connection = _connectionFactory.GetRabbitConnection();
             if (connection == null)
             {

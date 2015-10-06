@@ -10,6 +10,7 @@ using sensu_client.Configuration;
 using sensu_client.Connection;
 using RabbitMQ.Client.Framing.v0_9_1;
 using sensu_client.Helpers;
+using System.Diagnostics;
 
 namespace sensu_client
 {
@@ -36,17 +37,22 @@ namespace sensu_client
         }
         public void ProcessCheck(JObject check)
         {
-            Log.Debug("Processing check {0}", JsonConvert.SerializeObject(check, SerializerSettings));
-            JToken command;
-            if (check.TryGetValue("command", out command))
+            try {
+                Log.Debug("Processing check {0}", JsonConvert.SerializeObject(check, SerializerSettings));
+                JToken command;
+                if (check.TryGetValue("command", out command))
+                {
+                    check = _sensuClientConfigurationReader.MergeCheckWithLocalCheck(check);
+                    if (!ShouldRunInSafeMode(check))
+                        ExecuteCheckCommand(check);
+                }
+                else
+                {
+                    Log.Warn("Unknown check exception: {0}", check);
+                }
+            } catch (Exception e)
             {
-                check = _sensuClientConfigurationReader.MergeCheckWithLocalCheck(check);
-                if (!ShouldRunInSafeMode(check))
-                    ExecuteCheckCommand(check);
-            }
-            else
-            {
-                Log.Warn("Unknown check exception: {0}", check);
+                Log.Warn(e, "Unknown check exception: {0}", check);
             }
         }
 
@@ -89,6 +95,9 @@ namespace sensu_client
                     payload["check"]["type"] = "metric";
                     PublishResult(payload);
                 }
+            } catch (Exception e)
+            {
+                Log.Warn(e, "Error publishing check Result");
             }
             finally
             {
@@ -122,10 +131,11 @@ namespace sensu_client
                 CheckDidNotHaveValidName(check);
                 return;
             }
+            var checkName = check["name"].ToString();
 
-            if (CheckIsInProgress(check))
+            if (CheckIsInProgress(checkName))
             {
-                Log.Warn("Previous check command execution in progress {0}", check["command"]);
+                Log.Warn("Previous check command execution in progress {0}", checkName);
                 return;
             }
             var commandParseErrors = "";
@@ -138,23 +148,30 @@ namespace sensu_client
                 return;
             }
 
-            ChecksInProgress.Add(check["name"].ToString());
-            int? timeout = null;
-            if (check["timeout"] != null)
-                timeout = SensuClientHelper.TryParseNullable(check["timeout"].ToString());
+            Log.Debug("Preparing check to be launched: {0}", checkName);
+            ChecksInProgress.Add(checkName);
 
-            var commandToExcecute = CommandFactory.Create(
-                                                    new CommandConfiguration()
-                                                    {
-                                                        Plugins = _sensuClientConfigurationReader.SensuClientConfig.Client.Plugins,
-                                                        TimeOut = timeout
-                                                    }, check["command"].ToString());
+            try {
+                int? timeout = null;
+                if (check["timeout"] != null)
+                    timeout = SensuClientHelper.TryParseNullable(check["timeout"].ToString());
 
-            Log.Debug("About to run command: " + commandToExcecute.Arguments);
-            
-            Task<JObject> executingTask =  ExecuteCheck(check, commandToExcecute);
-            executingTask.ContinueWith(ReportCheckResultAfterCompletion);
+                var commandToExcecute = CommandFactory.Create(
+                                                        new CommandConfiguration()
+                                                        {
+                                                            Plugins = _sensuClientConfigurationReader.SensuClientConfig.Client.Plugins,
+                                                            TimeOut = timeout
+                                                        }, check["command"].ToString());
 
+                Log.Debug("About to run command: " + commandToExcecute.Arguments);
+
+                Task<JObject> executingTask = ExecuteCheck(check, commandToExcecute);
+                executingTask.ContinueWith(ReportCheckResultAfterCompletion);
+            } catch (Exception e)
+            {
+                Log.Error(e, "Error preparing check {0}", checkName, e);
+                ChecksInProgress.Remove(checkName);
+            }
         }
 
         private static Task<JObject> ExecuteCheck(JObject check,Command.Command command)
@@ -162,11 +179,21 @@ namespace sensu_client
 
             return Task.Factory.StartNew(() =>
             {
-                var result = command.Execute();
-
-                check["output"] = result.Output;
-                check["status"] = result.Status;
-                check["duration"] = result.Duration;
+                var stopwatch = new Stopwatch();
+                stopwatch.Start();
+                try
+                {
+                    var result = command.Execute();
+                    check["output"] = result.Output;
+                    check["status"] = result.Status;
+                } catch (Exception e)
+                {
+                    Log.Warn(e, "Error running check {0}", check.ToString());
+                    check["output"] = "";
+                    check["status"] = 2;
+                }
+                stopwatch.Stop();
+                check["duration"] = ((float)stopwatch.ElapsedMilliseconds) / 1000;
                 return check;
             });
         }
@@ -178,9 +205,9 @@ namespace sensu_client
             PublishCheckResult(check);
         }
 
-        private static bool CheckIsInProgress(JObject check)
+        private static bool CheckIsInProgress(string checkName)
         {
-            return ChecksInProgress.Contains(check["name"].ToString());
+            return ChecksInProgress.Contains(checkName);
         }
 
         private void CheckDidNotHaveValidParameters(JObject check, string commandErrors)

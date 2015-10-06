@@ -104,7 +104,7 @@ namespace sensu_client.UdpReceiver
                 }
                 catch (Exception ex)
                 {
-                    Log.Error("Error when receiving data from udp",ex);
+                    Log.Error(ex, "Error when receiving data from udp");
                 }
                 //Add Sleep to reduce CPU usage;
                 Thread.Sleep(1);
