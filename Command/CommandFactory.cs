@@ -7,23 +7,15 @@ using System.Collections.Generic;
 using System.Text;
 using System.Globalization;
 using System.Text.RegularExpressions;
+using System.Net;
 
 namespace sensu_client.Command
 {
-
-    public static class CommandProviders
-    {
-        public static string PowerShell = "powershell";
-        public static string Ruby = "ruby";
-        public static string Cmd = "cmd";
-
-    }
 
     public struct CommandResult
     {
         public string Output { get; set; }
         public int Status { get; set; }
-        public float Duration { get; set; }
     }
 
     public static class CommandFactory
@@ -33,6 +25,7 @@ namespace sensu_client.Command
         {
             var command_lower = command.ToLower();
             if (command_lower.StartsWith(PerformanceCounterCommand.PREFIX)) return new PerformanceCounterCommand(commandConfiguration, command);
+            if (command_lower.StartsWith(HTTPCommand.PREFIX)) return new HTTPCommand(commandConfiguration, command);
             if (command_lower.Contains(".ps1")) return new PowerShellCommand(commandConfiguration, command);
             if (command_lower.Contains(".rb")) return new RubyCommand(commandConfiguration, command);
 
@@ -84,10 +77,8 @@ namespace sensu_client.Command
                 RedirectStandardOutput = true
             };
             var process = new Process { StartInfo = processstartinfo };
-            var stopwatch = new Stopwatch();
             try
             {
-                stopwatch.Start();
                 process.Start();
                 if (_commandConfiguration.TimeOut.HasValue)
                 {
@@ -132,8 +123,6 @@ namespace sensu_client.Command
             {
                 process.Close();
             }
-            stopwatch.Stop();
-            result.Duration = ((float)stopwatch.ElapsedMilliseconds) / 1000;
             return result;
 
         }
@@ -280,7 +269,103 @@ namespace sensu_client.Command
             return _arguments;
         }
     }
-    
+
+
+    public class HTTPCommand : Command
+    {
+        public static string PREFIX = "!http> ";
+        private Dictionary<string, string> parameters = new Dictionary<string, string>();
+
+        public HTTPCommand(CommandConfiguration commandConfiguration, string unparsedCommand) : base(commandConfiguration, unparsedCommand)
+        {
+        }
+        
+        public override string FileName
+        {
+            // I'm afraid this method is not required in this Command
+            get { return ""; }
+            protected internal set { }
+        }
+
+        protected override string ParseArguments()
+        {
+            var rawArgs = _unparsedCommand.Substring(PREFIX.Length);
+            string[] split = rawArgs.Split(';');
+
+            for (var i = 0; i < split.Length; ++i)
+            {
+                var Item = split[i];
+                if (!Item.Contains("="))
+                {
+                    Log.Warn("Invalid format for argument {0}. Ignored.", Item);
+                    continue;
+                }
+                string[] aux = Item.Split(new char[] { '=' }, 2);
+                string key = aux[0].Trim();
+                string value = aux[1].Trim();
+
+                parameters[key] = value;
+            }
+
+            // retire the magic word
+            return rawArgs;
+        }
+
+        private string getParam(string key, string defaultValue)
+        {
+            if (parameters.ContainsKey(key))
+                return parameters[key];
+            return defaultValue;
+        }
+
+        public override CommandResult Execute()
+        {
+            var result = new CommandResult();
+            result.Status = 2;
+            result.Output = "No checks were run";
+
+            try {
+                var url = getParam("url", null);
+                var uri = new Uri(url);
+                var method = getParam("method", "GET");
+                var schema = getParam("schema", String.Format(CultureInfo.InvariantCulture, "{0}.http.{1}.{2}", System.Environment.MachineName, uri.Host, uri.Port));
+                var validStatusRaw = getParam("valid_codes", "200, 302");
+                var validStatus = new List<int>();
+                foreach (var code in validStatusRaw.Split(','))
+                    validStatus.Add(Int32.Parse(code));
+
+                var stopwatch = new Stopwatch();
+                stopwatch.Start();
+                var request = (HttpWebRequest)WebRequest.Create(url);
+                request.Method = method;
+                var response = (HttpWebResponse)request.GetResponse();
+                stopwatch.Stop();
+
+                if (validStatus.Contains((int)response.StatusCode))
+                {
+                    var unixTimestamp = (Int32)(DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1))).TotalSeconds;
+                    result.Output = String.Format(CultureInfo.InvariantCulture, "{0} {1:f2} {2}\n",
+                                    schema,
+                                    stopwatch.ElapsedMilliseconds / 1000.0,
+                                    unixTimestamp
+                                );
+                    result.Status = 0;
+                } else
+                {
+                    result.Output = String.Format("# Error accessing to {0} (code: {1}): {2}", url, response.StatusCode, response.StatusDescription);
+                    result.Status = 1;
+                }
+                
+            } catch (Exception e)
+            {
+                Log.Error(e, "There was an error accessing to an HTTP check");
+                result.Output = e.Message;
+                result.Status = 2;
+            }
+            
+            return result;
+        }
+    }
 
     public class PerformanceCounterCommand : Command
     {
@@ -291,7 +376,7 @@ namespace sensu_client.Command
         public PerformanceCounterCommand(CommandConfiguration commandConfiguration, string unparsedCommand) : base(commandConfiguration, unparsedCommand)
         {
         }
-
+        
         public override string FileName
         {
             // I'm afraid this method is not required in this Command
@@ -312,10 +397,8 @@ namespace sensu_client.Command
         public override CommandResult Execute()
         {
             var result = new CommandResult();
-            var stopwatch = new Stopwatch();
             result.Status = 0;
             result.Output = "No checks were run";
-            stopwatch.Start();
             {
                 string[] splittedArguments = ParseArguments().Split(';');
                 var counterlist = getCounterlist(splittedArguments[0]);
@@ -368,8 +451,6 @@ namespace sensu_client.Command
                     result.Output = stderr.Append(stdout).ToString().Trim(' ', '_');
                 }
             }
-            stopwatch.Stop();
-            result.Duration = ((float)stopwatch.ElapsedMilliseconds) / 1000;
 
             return result;
         }

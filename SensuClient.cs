@@ -39,7 +39,7 @@ namespace sensu_client
             catch (Exception ex)
             {
 
-                Log.Error("Error getting configuration reader:", ex);
+                Log.Error(ex, "Error getting configuration reader:");
             }
             
             
@@ -87,7 +87,7 @@ namespace sensu_client
             }
             catch (Exception exception)
             {
-                Log.Error("Fail on starting ", exception);
+                Log.Error(exception, "Fail on starting ");
             }
         }
 
@@ -114,7 +114,7 @@ namespace sensu_client
             catch (Exception ex)
             {
                 
-                Log.Error("Error loading configuration:",ex);
+                Log.Error(ex, "Error loading configuration:");
             }
             
         }

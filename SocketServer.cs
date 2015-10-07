@@ -39,7 +39,7 @@ namespace sensu_client
             }
             catch (Exception ex)
             {
-                Log.Error("Error opening connection",ex);
+                Log.Error(ex, "Error opening connection");
             }
 
         }
