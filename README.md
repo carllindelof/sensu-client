@@ -98,6 +98,9 @@ As long as this client can only run on Windows, it has several special features:
 - PowerShell is becoming the standard Windows administration shell scripting language, so just setting a `.ps1` file it will be run with a powershell interpreter.
 - Same happens with ruby scripts, which filename should end with `.rb`.
 
+Performance Counters
+____________________
+
 In addition, Windows allows a system similar to Sensu called "Performance Counters". These are small programs with a common interface. In order to check them, you can use the special command `!perfcounter> `. Example:
 
 ```
@@ -160,3 +163,30 @@ Finally, you can use the asterisk `*` to configure **any** instance:
 ```
 
 In this case, it will fail if **any** processor passes the limits.
+
+HTTP Checks
+___________
+
+Http checks are other useful resource when monitoring/alerting, so you can use `!http> ` keyword. Arguments:
+
+- `url`: the url to be used. Mandatory.
+- `schema`: the stats name. Should be Graphite-compliant. It will use the hostname and url as default.
+- `valid_codes`: a comma-separated list of valid codes (as integers). Default is "200,302".
+
+It will return the seconds to connect or error.
+
+Example:
+```
+{
+  "checks": {
+    "Check_HTTP_Service": {
+      "command": "!http> url=http://example.org; valid_codes=200; schema=whatever.foo.bar",
+      "type": "standard",
+      "standalone": true,
+      "handlers": [
+        "default"
+      ],
+    }
+  }
+}
+```
