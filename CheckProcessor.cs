@@ -22,12 +22,40 @@ namespace sensu_client
         
     }
 
+    public class InProgressCheck
+    {
+        private static readonly List<string> checksInProgress = new List<string>();
+        private static readonly Logger log = LogManager.GetCurrentClassLogger();
+
+        public bool Lock(string name)
+        {
+            lock (checksInProgress)
+            {
+                if (checksInProgress.Contains(name))
+                {
+                    return false;
+                }
+                checksInProgress.Add(name);
+                return true;
+            }
+        }
+
+        public void Unlock(string name)
+        {
+            lock (checksInProgress)
+            {
+                if (checksInProgress.Contains(name))
+                    checksInProgress.Remove(name);
+            }
+        }
+    }
+
     public class CheckProcessor : ICheckProcessor
     {
         private readonly ISensuRabbitMqConnectionFactory _connectionFactory;
         private readonly ISensuClientConfigurationReader _sensuClientConfigurationReader;
         private static readonly Logger Log = LogManager.GetCurrentClassLogger();
-        private static readonly List<string> ChecksInProgress = new List<string>();
+        private static readonly InProgressCheck checksInProgress = new InProgressCheck();
         private static readonly JsonSerializerSettings SerializerSettings = new JsonSerializerSettings { Formatting = Formatting.None };
 
         public CheckProcessor(ISensuRabbitMqConnectionFactory connectionFactory, ISensuClientConfigurationReader sensuClientConfigurationReader)
@@ -99,12 +127,6 @@ namespace sensu_client
             {
                 Log.Warn(e, "Error publishing check Result");
             }
-            finally
-            {
-                var name = check["name"].ToString();
-                if (ChecksInProgress.Contains(name))
-                    ChecksInProgress.Remove(name);
-            }
         }
 
         public void PublishResult(JObject payload)
@@ -133,7 +155,7 @@ namespace sensu_client
             }
             var checkName = check["name"].ToString();
 
-            if (CheckIsInProgress(checkName))
+            if (!checksInProgress.Lock(checkName))
             {
                 Log.Warn("Previous check command execution in progress {0}", checkName);
                 return;
@@ -149,7 +171,6 @@ namespace sensu_client
             }
 
             Log.Debug("Preparing check to be launched: {0}", checkName);
-            ChecksInProgress.Add(checkName);
 
             try {
                 int? timeout = null;
@@ -166,15 +187,22 @@ namespace sensu_client
                 Log.Debug("About to run command: " + commandToExcecute.Arguments);
 
                 Task<JObject> executingTask = ExecuteCheck(check, commandToExcecute);
-                executingTask.ContinueWith(ReportCheckResultAfterCompletion);
+                executingTask.ContinueWith(ReportCheckResultAfterCompletion).ContinueWith(CheckCompleted);
             } catch (Exception e)
             {
                 Log.Error(e, "Error preparing check {0}", checkName, e);
-                ChecksInProgress.Remove(checkName);
+                checksInProgress.Unlock(checkName);
             }
         }
 
-        private static Task<JObject> ExecuteCheck(JObject check,Command.Command command)
+        private void CheckCompleted(Task<JObject> executedTask)
+        {
+            var check = executedTask.Result;
+            var name = check["name"].ToString();
+            checksInProgress.Unlock(name);
+        }
+
+        private static Task<JObject> ExecuteCheck(JObject check, Command.Command command)
         {
 
             return Task.Factory.StartNew(() =>
@@ -198,16 +226,17 @@ namespace sensu_client
             });
         }
 
-        private void ReportCheckResultAfterCompletion(Task<JObject> executedTask)
+        private JObject ReportCheckResultAfterCompletion(Task<JObject> executedTask)
         {
             var check = executedTask.Result;
-            Log.Debug("ReportCheckResultAfterCompletion | about to report result for check : " + check["name"]);
-            PublishCheckResult(check);
-        }
-
-        private static bool CheckIsInProgress(string checkName)
-        {
-            return ChecksInProgress.Contains(checkName);
+            try {
+                Log.Debug("ReportCheckResultAfterCompletion | about to report result for check : " + check["name"]);
+                PublishCheckResult(check);
+            } catch( Exception e)
+            {
+                Log.Warn(e, "Error on check {0}", check);
+            }
+            return check;
         }
 
         private void CheckDidNotHaveValidParameters(JObject check, string commandErrors)
