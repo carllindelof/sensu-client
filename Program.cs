@@ -14,6 +14,7 @@ namespace sensu_client
         static void Main()
         {
             _log = LogManager.GetCurrentClassLogger();
+            _log.Warn("Service is about to start");
 #if DEBUG
             LogManager.GlobalThreshold = LogLevel.Trace;
 #endif
