@@ -111,9 +111,9 @@ namespace sensu_client.Command
             catch (Exception ex)
             {
                 Log.Warn(
-                    "Unexpected error when executing command: '{0}' on '{2}' \n {1} \n",
-                    _unparsedCommand,
                     ex,
+                    "Unexpected error when executing command: '{0}' on '{1}'",
+                    _unparsedCommand,
                     _commandConfiguration.Plugins
                     );
                 result.Output = String.Format("Unexpected error: {0}", ex.Message);
@@ -278,6 +278,7 @@ namespace sensu_client.Command
 
         public HTTPCommand(CommandConfiguration commandConfiguration, string unparsedCommand) : base(commandConfiguration, unparsedCommand)
         {
+            ParseArguments();
         }
         
         public override string FileName
@@ -326,6 +327,7 @@ namespace sensu_client.Command
 
             try {
                 var url = getParam("url", null);
+                var timeout = Int64.Parse(getParam("timeout", "10000"));
                 var uri = new Uri(url);
                 var method = getParam("method", "GET");
                 var schema = getParam("schema", String.Format(CultureInfo.InvariantCulture, "{0}.http.{1}.{2}", System.Environment.MachineName, uri.Host, uri.Port));

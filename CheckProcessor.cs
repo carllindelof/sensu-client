@@ -22,21 +22,58 @@ namespace sensu_client
         
     }
 
+    class  CheckData
+    {
+        public DateTime datetime;
+        public Task<JObject> task = null;
+
+        public CheckData()
+        {
+            this.datetime = DateTime.UtcNow;
+        }
+    }
+
     public class InProgressCheck
     {
-        private static readonly List<string> checksInProgress = new List<string>();
+        private static readonly Dictionary<string, CheckData> checksInProgress = new Dictionary<string, CheckData>();
         private static readonly Logger log = LogManager.GetCurrentClassLogger();
 
         public bool Lock(string name)
         {
             lock (checksInProgress)
             {
-                if (checksInProgress.Contains(name))
+                if (checksInProgress.ContainsKey(name))
                 {
-                    return false;
+                    var check = checksInProgress[name];
+                    var elapsed = DateTime.UtcNow - check.datetime;
+                    var task = check.task;
+                    if (task == null)
+                    {
+                        log.Warn("Previous check command execution in progress {0} for {1} milliseconds", name, elapsed.TotalMilliseconds);
+                        return false;
+                    }
+
+                    log.Warn("Previous check command execution in progress {0} for {1} milliseconds, with current status: {2}", name, elapsed.TotalMilliseconds, task.Status);
+                    if ( ! task.IsCompleted)
+                        return false;
+
+                    log.Warn("Task {0} was completed but not removed, so lock will be allowed.", name);
                 }
-                checksInProgress.Add(name);
+                log.Debug("Locking {0}", name);
+                checksInProgress[name] = new CheckData();
                 return true;
+            }
+        }
+
+        public void UnlockAnyway(string name)
+        {
+            lock (checksInProgress)
+            {
+                if (!checksInProgress.ContainsKey(name))
+                    return;
+
+                checksInProgress.Remove(name);
+                log.Debug("Unlocking {0}", name);
             }
         }
 
@@ -44,8 +81,28 @@ namespace sensu_client
         {
             lock (checksInProgress)
             {
-                if (checksInProgress.Contains(name))
+                if (!checksInProgress.ContainsKey(name))
+                    return;
+
+                var check = checksInProgress[name];
+                if (check.task != null && check.task.IsCompleted)
+                {
+                    log.Debug("Unlocking {0}", name);
                     checksInProgress.Remove(name);
+                }
+                else
+                {
+                    log.Warn("Trying to unlock a task with status {1} for check {0}", name, check.task.Status);
+                }
+            }
+        }
+
+        public void SetTask(string name, Task<JObject> task)
+        {
+            lock (checksInProgress)
+            {
+                if (checksInProgress.ContainsKey(name))
+                    checksInProgress[name].task = task;
             }
         }
     }
@@ -63,6 +120,7 @@ namespace sensu_client
             _connectionFactory = connectionFactory;
             _sensuClientConfigurationReader = sensuClientConfigurationReader;
         }
+
         public void ProcessCheck(JObject check)
         {
             try {
@@ -156,23 +214,22 @@ namespace sensu_client
             var checkName = check["name"].ToString();
 
             if (!checksInProgress.Lock(checkName))
-            {
-                Log.Warn("Previous check command execution in progress {0}", checkName);
                 return;
-            }
-            var commandParseErrors = "";
-            check["command"] = SensuClientHelper.SubstitueCommandTokens(
-                check, out commandParseErrors,(JObject) _sensuClientConfigurationReader.Configuration.Config["client"]);
-
-            if (!String.IsNullOrEmpty(commandParseErrors))
-            {
-                CheckDidNotHaveValidParameters(check, commandParseErrors);
-                return;
-            }
-
-            Log.Debug("Preparing check to be launched: {0}", checkName);
 
             try {
+                var commandParseErrors = "";
+                check["command"] = SensuClientHelper.SubstitueCommandTokens(
+                    check, out commandParseErrors, (JObject)_sensuClientConfigurationReader.Configuration.Config["client"]);
+
+                if (!String.IsNullOrEmpty(commandParseErrors))
+                {
+                    Log.Warn("Errors parsing the command: {0}", commandParseErrors);
+                    CheckDidNotHaveValidParameters(check, commandParseErrors);
+                    throw new Exception(String.Format("Errors parsing the command {0}", commandParseErrors));
+                }
+
+                Log.Debug("Preparing check to be launched: {0}", checkName);
+
                 int? timeout = null;
                 if (check["timeout"] != null)
                     timeout = SensuClientHelper.TryParseNullable(check["timeout"].ToString());
@@ -184,14 +241,14 @@ namespace sensu_client
                                                             TimeOut = timeout
                                                         }, check["command"].ToString());
 
-                Log.Debug("About to run command: " + commandToExcecute.Arguments);
-
+                Log.Debug("About to run command: " + checkName);
                 Task<JObject> executingTask = ExecuteCheck(check, commandToExcecute);
+                checksInProgress.SetTask(checkName, executingTask);
                 executingTask.ContinueWith(ReportCheckResultAfterCompletion).ContinueWith(CheckCompleted);
             } catch (Exception e)
             {
-                Log.Error(e, "Error preparing check {0}", checkName, e);
-                checksInProgress.Unlock(checkName);
+                Log.Error(e, "Error preparing check {0}", checkName);
+                checksInProgress.UnlockAnyway(checkName);
             }
         }
 
