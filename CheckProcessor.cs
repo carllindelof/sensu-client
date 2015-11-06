@@ -169,7 +169,10 @@ namespace sensu_client
             var payload = new JObject();
             payload["check"] = check;
             payload["client"] = _sensuClientConfigurationReader.SensuClientConfig.Client.Name;
+            if (_sensuClientConfigurationReader.SensuClientConfig.Client.MailTo.Count > 0)
+                payload["check"]["mail_to"] = string.Join(",", _sensuClientConfigurationReader.SensuClientConfig.Client.MailTo);
             payload["check"]["executed"] = SensuClientHelper.CreateTimeStamp();
+            payload["check"]["issued"] = payload["check"]["executed"];
 
             try
             {
