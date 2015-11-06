@@ -10,6 +10,7 @@ using RabbitMQ.Client.Framing.v0_9_1;
 using sensu_client.Configuration;
 using sensu_client.Connection;
 using sensu_client.Helpers;
+using System.Reflection;
 
 namespace sensu_client
 {
@@ -21,6 +22,7 @@ namespace sensu_client
         private static readonly Logger Log = LogManager.GetCurrentClassLogger();
         private static readonly object MonitorObject = new object();
         private readonly ManualResetEvent _stopEvent = new ManualResetEvent(false);
+        private static readonly string Version = Assembly.GetExecutingAssembly().GetName().Version + "-C#";
 
         public KeepAliveScheduler(ISensuRabbitMqConnectionFactory connectionFactory, ISensuClientConfigurationReader sensuClientConfigurationReader)
         {
@@ -104,6 +106,7 @@ namespace sensu_client
             var keepAlive = _sensuClientConfigurationReader.Configuration.Config["client"];
 
             keepAlive["timestamp"] = SensuClientHelper.CreateTimeStamp();
+            keepAlive["version"] = Version; // Undocumented stuff to send the client version
             keepAlive["plugins"] = "";
 
             List<string> redactlist = null;

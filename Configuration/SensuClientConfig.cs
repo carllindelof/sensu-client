@@ -35,6 +35,8 @@ namespace sensu_client.Configuration
             get { return _send_metric_with_check; }
             set { _send_metric_with_check = value; }
         }
+        [JsonProperty("mail_to")]
+        public List<string> MailTo { get; set; }
     }
 
     public class Rabbitmq
